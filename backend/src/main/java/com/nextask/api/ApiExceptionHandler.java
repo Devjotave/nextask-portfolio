@@ -15,9 +15,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.nextask.comment.error.CommentNotFoundException;
+import com.nextask.project.error.ProjectNotFoundException;
+import com.nextask.task.error.TaskConcurrentUpdateException;
+import com.nextask.task.error.TaskNotFoundException;
 import com.nextask.user.error.EmailAlreadyInUseException;
 import com.nextask.user.error.UserHasWorkspaceMembershipsException;
 import com.nextask.user.error.UserNotFoundException;
+import com.nextask.workspace.error.UserMustBelongToWorkspaceException;
 import com.nextask.workspace.error.WorkspaceMemberAlreadyExistsException;
 import com.nextask.workspace.error.WorkspaceMemberNotFoundException;
 import com.nextask.workspace.error.WorkspaceMustHaveOwnerException;
@@ -33,6 +38,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI WORKSPACE_MEMBER_NOT_FOUND = URI.create("urn:nextask:problem:workspace-member-not-found");
     private static final URI WORKSPACE_MEMBER_ALREADY_EXISTS = URI.create("urn:nextask:problem:workspace-member-already-exists");
     private static final URI WORKSPACE_MUST_HAVE_OWNER = URI.create("urn:nextask:problem:workspace-must-have-owner");
+    private static final URI USER_MUST_BELONG_TO_WORKSPACE = URI.create("urn:nextask:problem:user-must-belong-to-workspace");
+    private static final URI PROJECT_NOT_FOUND = URI.create("urn:nextask:problem:project-not-found");
+    private static final URI TASK_NOT_FOUND = URI.create("urn:nextask:problem:task-not-found");
+    private static final URI COMMENT_NOT_FOUND = URI.create("urn:nextask:problem:comment-not-found");
+    private static final URI TASK_CONCURRENT_UPDATE = URI.create("urn:nextask:problem:task-concurrent-update");
     private static final URI VALIDATION_FAILED = URI.create("urn:nextask:problem:validation-failed");
 
     @ExceptionHandler(UserNotFoundException.class)
@@ -87,6 +97,41 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.CONFLICT,
                 WORKSPACE_MUST_HAVE_OWNER,
                 "Workspace must have an owner",
+                exception);
+    }
+
+    @ExceptionHandler(UserMustBelongToWorkspaceException.class)
+    ResponseEntity<ProblemDetail> handleUserMustBelongToWorkspace(
+            UserMustBelongToWorkspaceException exception) {
+        return problem(
+                HttpStatus.CONFLICT,
+                USER_MUST_BELONG_TO_WORKSPACE,
+                "User must belong to workspace",
+                exception);
+    }
+
+    @ExceptionHandler(ProjectNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleProjectNotFound(ProjectNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND, "Project not found", exception);
+    }
+
+    @ExceptionHandler(TaskNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleTaskNotFound(TaskNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, TASK_NOT_FOUND, "Task not found", exception);
+    }
+
+    @ExceptionHandler(CommentNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleCommentNotFound(CommentNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, COMMENT_NOT_FOUND, "Comment not found", exception);
+    }
+
+    @ExceptionHandler(TaskConcurrentUpdateException.class)
+    ResponseEntity<ProblemDetail> handleTaskConcurrentUpdate(
+            TaskConcurrentUpdateException exception) {
+        return problem(
+                HttpStatus.CONFLICT,
+                TASK_CONCURRENT_UPDATE,
+                "Task was updated concurrently",
                 exception);
     }
 
