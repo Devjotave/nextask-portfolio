@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 2 concluída: tabela `users` e entidade JPA `User`.
+Em desenvolvimento — Fase 3 concluída: API REST de usuários.
 
 ## Objetivo
 
@@ -15,7 +15,7 @@ O NexTask será uma aplicação web para gerenciamento colaborativo de projetos 
 ```text
 React + TypeScript (fase futura)
              ↓
-       API REST (fase futura)
+       API REST
              ↓
         Spring Boot 3
              ↓
@@ -34,11 +34,12 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - Spring Web
 - Spring Data JPA / Hibernate
 - Bean Validation
+- Spring Security Crypto / PBKDF2
 - Spring Boot Actuator
 - Microsoft SQL Server 2022 Express
 - JUnit 5
 
-Spring Security, JWT, Swagger e React entram em fases posteriores, junto com código e testes que justifiquem essas dependências.
+Autenticação com Spring Security, JWT, Swagger e React entram em fases posteriores, junto com código e testes que justifiquem essas dependências. Nesta fase, apenas o módulo criptográfico do Spring Security é usado para impedir o armazenamento de senhas em texto puro.
 
 ## Pré-requisitos
 
@@ -104,7 +105,7 @@ Teste real de integração com SQL Server:
 .\mvnw.cmd verify -Pintegration-test
 ```
 
-Os testes de integração confirmam o banco ativo (`nextask`), o login utilizado pela aplicação (`nextask_app`) e a persistência real da entidade `User`.
+Os testes de integração confirmam o banco ativo (`nextask`), o login utilizado pela aplicação (`nextask_app`), a persistência real da entidade `User` e o fluxo HTTP da API, incluindo o hash de senha.
 
 ## Segurança local
 
@@ -118,7 +119,8 @@ Os testes de integração confirmam o banco ativo (`nextask`), o login utilizado
 Os roteiros explicados estão disponíveis por fase:
 
 - [`docs/phase-1.md`](docs/phase-1.md): preparação, configuração do Git e publicação;
-- [`docs/phase-2.md`](docs/phase-2.md): modelagem da tabela `users` e da entidade `User`.
+- [`docs/phase-2.md`](docs/phase-2.md): modelagem da tabela `users` e da entidade `User`;
+- [`docs/phase-3.md`](docs/phase-3.md): API REST, validação, erros e hash de senha.
 
 ## Roadmap resumido
 
@@ -127,7 +129,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] Script reproduzível de configuração do SQL Server
 - [x] Validar banco e aplicação no ambiente local
 - [x] Modelagem persistente de usuários
-- [ ] API de usuários
+- [x] API de usuários
 - [ ] Workspaces e permissões
 - [ ] Projetos, tarefas e comentários
 - [ ] Spring Security e JWT
