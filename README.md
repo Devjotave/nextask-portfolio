@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 1: preparação do ambiente e conexão com o banco.
+Em desenvolvimento — Fase 2 concluída: tabela `users` e entidade JPA `User`.
 
 ## Objetivo
 
@@ -26,7 +26,7 @@ React + TypeScript (fase futura)
 
 O backend começa como um monólito modular em camadas. Os packages de cada módulo serão criados apenas quando a respectiva funcionalidade for implementada; Git não versiona diretórios vazios.
 
-## Tecnologias da Fase 1
+## Tecnologias da base atual
 
 - Java 21 LTS
 - Spring Boot 3.5
@@ -64,10 +64,11 @@ Spring Security, JWT, Swagger e React entram em fases posteriores, junto com có
 4. Prepare o banco usando sua autenticação do Windows:
 
    ```powershell
-   .\database\setup-database.ps1
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\database\setup-database.ps1
    ```
 
-   O script cria de forma idempotente o banco `nextask`, o login `nextask_app` e suas permissões mínimas de leitura e escrita.
+   O script cria de forma idempotente o banco `nextask`, o login `nextask_app`, suas permissões mínimas de leitura e escrita e o schema da fase atual.
+   Aguarde a mensagem `NexTask database, schema, and application login are ready.` antes de iniciar o backend ou os testes de integração. O `Bypass` vale apenas para esse processo e não altera permanentemente a política do PowerShell.
 
 5. Execute o backend:
 
@@ -103,7 +104,7 @@ Teste real de integração com SQL Server:
 .\mvnw.cmd verify -Pintegration-test
 ```
 
-O teste de integração confirma tanto o banco ativo (`nextask`) quanto o login utilizado pela aplicação (`nextask_app`).
+Os testes de integração confirmam o banco ativo (`nextask`), o login utilizado pela aplicação (`nextask_app`) e a persistência real da entidade `User`.
 
 ## Segurança local
 
@@ -114,7 +115,10 @@ O teste de integração confirma tanto o banco ativo (`nextask`) quanto o login 
 
 ## Documentação
 
-O roteiro explicado da preparação, da configuração do Git e da publicação está em [`docs/phase-1.md`](docs/phase-1.md).
+Os roteiros explicados estão disponíveis por fase:
+
+- [`docs/phase-1.md`](docs/phase-1.md): preparação, configuração do Git e publicação;
+- [`docs/phase-2.md`](docs/phase-2.md): modelagem da tabela `users` e da entidade `User`.
 
 ## Roadmap resumido
 
@@ -122,7 +126,8 @@ O roteiro explicado da preparação, da configuração do Git e da publicação 
 - [x] Backend Spring Boot
 - [x] Script reproduzível de configuração do SQL Server
 - [x] Validar banco e aplicação no ambiente local
-- [ ] Usuários
+- [x] Modelagem persistente de usuários
+- [ ] API de usuários
 - [ ] Workspaces e permissões
 - [ ] Projetos, tarefas e comentários
 - [ ] Spring Security e JWT

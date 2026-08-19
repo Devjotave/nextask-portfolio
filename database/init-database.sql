@@ -60,9 +60,33 @@ GO
 GRANT CONNECT TO [$(AppLogin)];
 GO
 
+IF OBJECT_ID(N'dbo.users', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[users]
+    (
+        [id] bigint IDENTITY(1, 1) NOT NULL,
+        [name] nvarchar(120) NOT NULL,
+        [email] nvarchar(254) NOT NULL,
+        [password_hash] nvarchar(255) NOT NULL,
+        [created_at] datetimeoffset(6) NOT NULL
+            CONSTRAINT [DF_users_created_at] DEFAULT (SYSUTCDATETIME()),
+        [updated_at] datetimeoffset(6) NOT NULL
+            CONSTRAINT [DF_users_updated_at] DEFAULT (SYSUTCDATETIME()),
+
+        CONSTRAINT [PK_users] PRIMARY KEY CLUSTERED ([id]),
+        CONSTRAINT [UQ_users_email] UNIQUE NONCLUSTERED ([email]),
+        CONSTRAINT [CK_users_name_not_blank]
+            CHECK (LEN(LTRIM(RTRIM([name]))) > 0),
+        CONSTRAINT [CK_users_email_not_blank]
+            CHECK (LEN(LTRIM(RTRIM([email]))) > 0),
+        CONSTRAINT [CK_users_password_hash_not_blank]
+            CHECK (LEN(LTRIM(RTRIM([password_hash]))) > 0)
+    );
+END;
+GO
+
 SELECT
     DB_NAME() AS database_name,
     SUSER_SNAME() AS executed_by,
     N'$(AppLogin)' AS application_login;
 GO
-

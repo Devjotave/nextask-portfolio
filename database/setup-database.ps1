@@ -47,4 +47,4 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Database setup failed. Review the SQL Server authentication mode and the error above.'
 }
 
-Write-Host 'NexTask database and application login are ready.' -ForegroundColor Green
+Write-Host 'NexTask database, schema, and application login are ready.' -ForegroundColor Green
