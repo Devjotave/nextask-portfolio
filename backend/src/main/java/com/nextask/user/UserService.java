@@ -10,13 +10,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nextask.api.PageResponse;
 import com.nextask.entity.User;
 import com.nextask.user.api.CreateUserRequest;
-import com.nextask.user.api.PageResponse;
 import com.nextask.user.api.UpdateUserRequest;
 import com.nextask.user.api.UserResponse;
 import com.nextask.user.error.EmailAlreadyInUseException;
 import com.nextask.user.error.UserNotFoundException;
+import com.nextask.user.error.UserHasWorkspaceMembershipsException;
 
 @Service
 @Transactional(readOnly = true)
@@ -83,8 +84,13 @@ public class UserService {
     @Transactional
     public void delete(Long id) {
         User user = findUser(id);
-        userRepository.delete(user);
-        userRepository.flush();
+
+        try {
+            userRepository.delete(user);
+            userRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new UserHasWorkspaceMembershipsException(id);
+        }
     }
 
     private void rejectDuplicateEmail(String normalizedEmail) {

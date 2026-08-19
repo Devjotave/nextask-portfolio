@@ -85,6 +85,61 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.workspaces', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[workspaces]
+    (
+        [id] bigint IDENTITY(1, 1) NOT NULL,
+        [name] nvarchar(120) NOT NULL,
+        [created_at] datetimeoffset(6) NOT NULL
+            CONSTRAINT [DF_workspaces_created_at] DEFAULT (SYSUTCDATETIME()),
+        [updated_at] datetimeoffset(6) NOT NULL
+            CONSTRAINT [DF_workspaces_updated_at] DEFAULT (SYSUTCDATETIME()),
+
+        CONSTRAINT [PK_workspaces] PRIMARY KEY CLUSTERED ([id]),
+        CONSTRAINT [CK_workspaces_name_not_blank]
+            CHECK (LEN(LTRIM(RTRIM([name]))) > 0)
+    );
+END;
+GO
+
+IF OBJECT_ID(N'dbo.workspace_members', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[workspace_members]
+    (
+        [workspace_id] bigint NOT NULL,
+        [user_id] bigint NOT NULL,
+        [role] varchar(20) NOT NULL,
+        [joined_at] datetimeoffset(6) NOT NULL
+            CONSTRAINT [DF_workspace_members_joined_at] DEFAULT (SYSUTCDATETIME()),
+
+        CONSTRAINT [PK_workspace_members]
+            PRIMARY KEY CLUSTERED ([workspace_id], [user_id]),
+        CONSTRAINT [FK_workspace_members_workspace]
+            FOREIGN KEY ([workspace_id]) REFERENCES [dbo].[workspaces] ([id])
+            ON DELETE CASCADE,
+        CONSTRAINT [FK_workspace_members_user]
+            FOREIGN KEY ([user_id]) REFERENCES [dbo].[users] ([id])
+            ON DELETE NO ACTION,
+        CONSTRAINT [CK_workspace_members_role]
+            CHECK ([role] IN ('OWNER', 'MEMBER'))
+    );
+END;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE [name] = N'IX_workspace_members_user_id'
+      AND [object_id] = OBJECT_ID(N'dbo.workspace_members')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_workspace_members_user_id]
+        ON [dbo].[workspace_members] ([user_id], [workspace_id]);
+END;
+GO
+
 SELECT
     DB_NAME() AS database_name,
     SUSER_SNAME() AS executed_by,

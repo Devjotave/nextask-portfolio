@@ -1,4 +1,4 @@
-package com.nextask.user.api;
+package com.nextask.api;
 
 import java.util.List;
 

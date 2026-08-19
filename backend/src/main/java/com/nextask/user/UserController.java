@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nextask.api.PageResponse;
 import com.nextask.user.api.CreateUserRequest;
-import com.nextask.user.api.PageResponse;
 import com.nextask.user.api.UpdateUserRequest;
 import com.nextask.user.api.UserResponse;
 

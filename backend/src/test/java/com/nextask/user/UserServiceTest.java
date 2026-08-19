@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -23,6 +24,7 @@ import com.nextask.entity.User;
 import com.nextask.user.api.CreateUserRequest;
 import com.nextask.user.api.UserResponse;
 import com.nextask.user.error.EmailAlreadyInUseException;
+import com.nextask.user.error.UserHasWorkspaceMembershipsException;
 import com.nextask.user.error.UserNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,5 +97,17 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.findById(99L))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("User 99 was not found");
+    }
+
+    @Test
+    void rejectsDeletingUserThatStillBelongsToWorkspace() {
+        User user = new User("Ada Lovelace", "ada@example.com", "encoded-password");
+        when(userRepository.findById(42L)).thenReturn(java.util.Optional.of(user));
+        org.mockito.Mockito.doThrow(new DataIntegrityViolationException("foreign key"))
+                .when(userRepository).flush();
+
+        assertThatThrownBy(() -> userService.delete(42L))
+                .isInstanceOf(UserHasWorkspaceMembershipsException.class)
+                .hasMessage("User 42 still belongs to one or more workspaces");
     }
 }

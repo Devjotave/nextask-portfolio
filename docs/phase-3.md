@@ -25,8 +25,10 @@ O módulo `com.nextask.user` reúne a funcionalidade por domínio:
 - `UserRepository`: abstração Spring Data JPA e consultas de unicidade;
 - `UserService`: transações e casos de uso;
 - `UserController`: contrato HTTP;
-- `api`: DTOs de entrada, saída e paginação;
-- `error`: exceções e respostas HTTP padronizadas.
+- `api`: DTOs de entrada e saída;
+- `error`: exceções específicas do módulo.
+
+Os elementos compartilhados entre módulos, `PageResponse` e `ApiExceptionHandler`, passaram a morar em `com.nextask.api` na Fase 4.
 
 O controller nunca devolve `User` diretamente. `UserResponse` contém somente `id`, `name`, `email`, `createdAt` e `updatedAt`, impedindo que `passwordHash` seja serializado por acidente.
 
@@ -129,7 +131,7 @@ Invoke-RestMethod http://localhost:8080/api/users?page=0`&size=20
 - autenticar o usuário e emitir JWT;
 - restringir consulta, atualização e remoção conforme identidade e permissões;
 - criar fluxo autenticado de troca de senha;
-- relacionar usuários a workspaces e papéis;
+- aplicar a identidade autenticada às permissões de workspace;
 - versionar e documentar o contrato com OpenAPI.
 
 ## 10. Como explicar em uma entrevista

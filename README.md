@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 3 concluída: API REST de usuários.
+Em desenvolvimento — Fase 4 concluída: workspaces, membros e papéis.
 
 ## Objetivo
 
@@ -105,7 +105,7 @@ Teste real de integração com SQL Server:
 .\mvnw.cmd verify -Pintegration-test
 ```
 
-Os testes de integração confirmam o banco ativo (`nextask`), o login utilizado pela aplicação (`nextask_app`), a persistência real da entidade `User` e o fluxo HTTP da API, incluindo o hash de senha.
+Os testes confirmam 22 cenários rápidos e 9 cenários de integração com o SQL Server, cobrindo o banco ativo (`nextask`), o login da aplicação (`nextask_app`) e os fluxos HTTP de usuários, workspaces e membros.
 
 ## Segurança local
 
@@ -120,7 +120,8 @@ Os roteiros explicados estão disponíveis por fase:
 
 - [`docs/phase-1.md`](docs/phase-1.md): preparação, configuração do Git e publicação;
 - [`docs/phase-2.md`](docs/phase-2.md): modelagem da tabela `users` e da entidade `User`;
-- [`docs/phase-3.md`](docs/phase-3.md): API REST, validação, erros e hash de senha.
+- [`docs/phase-3.md`](docs/phase-3.md): API REST, validação, erros e hash de senha;
+- [`docs/phase-4.md`](docs/phase-4.md): workspaces, membros, papéis e consistência transacional.
 
 ## Roadmap resumido
 
@@ -130,7 +131,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] Validar banco e aplicação no ambiente local
 - [x] Modelagem persistente de usuários
 - [x] API de usuários
-- [ ] Workspaces e permissões
+- [x] Workspaces e permissões
 - [ ] Projetos, tarefas e comentários
 - [ ] Spring Security e JWT
 - [ ] Swagger/OpenAPI
