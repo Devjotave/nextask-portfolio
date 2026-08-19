@@ -28,9 +28,5 @@ public record CreateTaskRequest(
         @Positive(message = "assigneeId must be positive")
         Long assigneeId,
 
-        @NotNull(message = "createdById is required")
-        @Positive(message = "createdById must be positive")
-        Long createdById,
-
         OffsetDateTime dueAt) {
 }

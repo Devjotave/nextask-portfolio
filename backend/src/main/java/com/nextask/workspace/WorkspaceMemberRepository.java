@@ -14,6 +14,8 @@ public interface WorkspaceMemberRepository
 
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
 
+    boolean existsByIdAndRole(WorkspaceMemberId id, WorkspaceRole role);
+
     @EntityGraph(attributePaths = "workspace")
     Page<WorkspaceMember> findByUser_IdOrderByWorkspace_IdAsc(
             Long userId,

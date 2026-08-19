@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.nextask.entity.User;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.user.UserRepository;
 import com.nextask.workspace.api.AddWorkspaceMemberRequest;
 import com.nextask.workspace.api.CreateWorkspaceRequest;
@@ -47,6 +49,12 @@ class WorkspaceServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private AuthenticatedUser authenticatedUser;
+
+    @Mock
+    private WorkspaceMembershipValidator membershipValidator;
+
     private WorkspaceService workspaceService;
 
     @BeforeEach
@@ -54,7 +62,10 @@ class WorkspaceServiceTest {
         workspaceService = new WorkspaceService(
                 workspaceRepository,
                 memberRepository,
-                userRepository);
+                userRepository,
+                authenticatedUser,
+                membershipValidator);
+        lenient().when(authenticatedUser.id()).thenReturn(7L);
     }
 
     @Test
@@ -74,7 +85,7 @@ class WorkspaceServiceTest {
                 });
 
         WorkspaceResponse response = workspaceService.create(
-                new CreateWorkspaceRequest(" Product Team ", 7L));
+                new CreateWorkspaceRequest(" Product Team "));
 
         ArgumentCaptor<WorkspaceMember> memberCaptor =
                 ArgumentCaptor.forClass(WorkspaceMember.class);

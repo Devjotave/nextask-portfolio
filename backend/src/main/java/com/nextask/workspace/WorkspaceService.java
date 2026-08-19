@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextask.api.PageResponse;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.entity.User;
 import com.nextask.user.UserRepository;
 import com.nextask.user.error.UserNotFoundException;
@@ -33,35 +34,38 @@ public class WorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final AuthenticatedUser authenticatedUser;
+    private final WorkspaceMembershipValidator membershipValidator;
 
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
             WorkspaceMemberRepository memberRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            WorkspaceMembershipValidator membershipValidator) {
         this.workspaceRepository = workspaceRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
+        this.authenticatedUser = authenticatedUser;
+        this.membershipValidator = membershipValidator;
     }
 
     @Transactional
     public WorkspaceResponse create(CreateWorkspaceRequest request) {
-        User owner = findUser(request.ownerId());
+        User owner = findUser(authenticatedUser.id());
         Workspace workspace = workspaceRepository.saveAndFlush(new Workspace(request.name()));
         memberRepository.saveAndFlush(new WorkspaceMember(workspace, owner, WorkspaceRole.OWNER));
         return toWorkspaceResponse(workspace);
     }
 
     public WorkspaceResponse findById(Long workspaceId) {
-        return toWorkspaceResponse(findWorkspace(workspaceId));
+        Workspace workspace = findWorkspace(workspaceId);
+        membershipValidator.requireAccess(workspaceId, authenticatedUser.id());
+        return toWorkspaceResponse(workspace);
     }
 
-    public PageResponse<UserWorkspaceResponse> findAllForUser(
-            Long userId,
-            int page,
-            int size) {
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
-        }
+    public PageResponse<UserWorkspaceResponse> findAllForCurrentUser(int page, int size) {
+        Long userId = authenticatedUser.id();
 
         Page<UserWorkspaceResponse> workspaces = memberRepository
                 .findByUser_IdOrderByWorkspace_IdAsc(userId, PageRequest.of(page, size))
@@ -71,6 +75,7 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspaceResponse update(Long workspaceId, UpdateWorkspaceRequest request) {
+        membershipValidator.requireOwner(workspaceId, authenticatedUser.id());
         Workspace workspace = findWorkspace(workspaceId);
         workspace.rename(request.name());
         return toWorkspaceResponse(workspaceRepository.saveAndFlush(workspace));
@@ -78,6 +83,7 @@ public class WorkspaceService {
 
     @Transactional
     public void delete(Long workspaceId) {
+        membershipValidator.requireOwner(workspaceId, authenticatedUser.id());
         Workspace workspace = findWorkspaceForUpdate(workspaceId);
         workspaceRepository.delete(workspace);
         workspaceRepository.flush();
@@ -87,9 +93,8 @@ public class WorkspaceService {
             Long workspaceId,
             int page,
             int size) {
-        if (!workspaceRepository.existsById(workspaceId)) {
-            throw new WorkspaceNotFoundException(workspaceId);
-        }
+        findWorkspace(workspaceId);
+        membershipValidator.requireAccess(workspaceId, authenticatedUser.id());
 
         Page<WorkspaceMemberResponse> members = memberRepository
                 .findByWorkspace_IdOrderByUser_IdAsc(workspaceId, PageRequest.of(page, size))
@@ -101,6 +106,7 @@ public class WorkspaceService {
     public WorkspaceMemberResponse addMember(
             Long workspaceId,
             AddWorkspaceMemberRequest request) {
+        membershipValidator.requireOwner(workspaceId, authenticatedUser.id());
         Workspace workspace = findWorkspace(workspaceId);
         User user = findUser(request.userId());
         WorkspaceMemberId memberId = new WorkspaceMemberId(workspaceId, request.userId());
@@ -122,6 +128,7 @@ public class WorkspaceService {
             Long workspaceId,
             Long userId,
             UpdateWorkspaceMemberRequest request) {
+        membershipValidator.requireOwner(workspaceId, authenticatedUser.id());
         findWorkspaceForUpdate(workspaceId);
         WorkspaceMember member = findMember(workspaceId, userId);
 
@@ -136,6 +143,7 @@ public class WorkspaceService {
 
     @Transactional
     public void removeMember(Long workspaceId, Long userId) {
+        membershipValidator.requireOwner(workspaceId, authenticatedUser.id());
         findWorkspaceForUpdate(workspaceId);
         WorkspaceMember member = findMember(workspaceId, userId);
 

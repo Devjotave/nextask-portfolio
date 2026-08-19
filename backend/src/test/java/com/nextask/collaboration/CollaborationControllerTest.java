@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,9 +34,10 @@ import com.nextask.task.api.CreateTaskRequest;
 import com.nextask.task.api.TaskResponse;
 import com.nextask.task.entity.TaskPriority;
 import com.nextask.task.entity.TaskStatus;
-import com.nextask.workspace.error.UserMustBelongToWorkspaceException;
+import com.nextask.workspace.error.WorkspaceAccessDeniedException;
 
 @WebMvcTest({ProjectController.class, TaskController.class, CommentController.class})
+@AutoConfigureMockMvc(addFilters = false)
 class CollaborationControllerTest {
 
     private static final OffsetDateTime TIMESTAMP = OffsetDateTime.of(
@@ -71,8 +73,7 @@ class CollaborationControllerTest {
 
         CreateProjectRequest request = new CreateProjectRequest(
                 "Product",
-                "Roadmap",
-                1L);
+                "Roadmap");
 
         mockMvc.perform(post("/api/workspaces/10/projects")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -91,7 +92,6 @@ class CollaborationControllerTest {
                 null,
                 -1,
                 null,
-                null,
                 null);
 
         mockMvc.perform(post("/api/projects/20/tasks")
@@ -104,9 +104,7 @@ class CollaborationControllerTest {
                 .andExpect(jsonPath("$.errors.title").value("title is required"))
                 .andExpect(jsonPath("$.errors.priority").value("priority is required"))
                 .andExpect(jsonPath("$.errors.position")
-                        .value("position must not be negative"))
-                .andExpect(jsonPath("$.errors.createdById")
-                        .value("createdById is required"));
+                        .value("position must not be negative"));
     }
 
     @Test
@@ -133,7 +131,6 @@ class CollaborationControllerTest {
                 TaskPriority.HIGH,
                 0,
                 2L,
-                1L,
                 null);
 
         mockMvc.perform(post("/api/projects/20/tasks")
@@ -146,17 +143,17 @@ class CollaborationControllerTest {
     }
 
     @Test
-    void rejectsCommentAuthorOutsideWorkspace() throws Exception {
+    void rejectsAuthenticatedUserOutsideWorkspace() throws Exception {
         when(commentService.create(eq(30L), any(CreateCommentRequest.class)))
-                .thenThrow(new UserMustBelongToWorkspaceException(10L, 9L));
-        CreateCommentRequest request = new CreateCommentRequest("Review", 9L);
+                .thenThrow(new WorkspaceAccessDeniedException(10L));
+        CreateCommentRequest request = new CreateCommentRequest("Review");
 
         mockMvc.perform(post("/api/tasks/30/comments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
-                .andExpect(status().isConflict())
+                .andExpect(status().isForbidden())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type")
-                        .value("urn:nextask:problem:user-must-belong-to-workspace"));
+                        .value("urn:nextask:problem:workspace-access-denied"));
     }
 }

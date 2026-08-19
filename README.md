@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 5 concluída: projetos, tarefas e comentários.
+Em desenvolvimento — Fase 6 concluída: autenticação, JWT e autorização por workspace.
 
 ## Objetivo
 
@@ -34,12 +34,13 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - Spring Web
 - Spring Data JPA / Hibernate
 - Bean Validation
-- Spring Security Crypto / PBKDF2
+- Spring Security / PBKDF2
+- OAuth2 Resource Server / JWT
 - Spring Boot Actuator
 - Microsoft SQL Server 2022 Express
 - JUnit 5
 
-Autenticação com Spring Security, JWT, Swagger e React entram em fases posteriores, junto com código e testes que justifiquem essas dependências. Nesta fase, apenas o módulo criptográfico do Spring Security é usado para impedir o armazenamento de senhas em texto puro.
+O backend possui autenticação stateless com tokens JWT assinados por HMAC. Swagger e React entram nas próximas fases, junto com código e testes que justifiquem essas dependências.
 
 ## Pré-requisitos
 
@@ -58,7 +59,14 @@ Autenticação com Spring Security, JWT, Swagger e React entram em fases posteri
    Copy-Item .env.example .env
    ```
 
-2. Troque a senha de exemplo em `.env`. O arquivo é ignorado pelo Git.
+2. Troque a senha de exemplo em `.env` e gere uma chave JWT privada. O arquivo é ignorado pelo Git.
+
+   ```powershell
+   $jwtBytes = New-Object byte[] 32
+   [Security.Cryptography.RandomNumberGenerator]::Fill($jwtBytes)
+   $jwtSecret = [Convert]::ToBase64String($jwtBytes)
+   (Get-Content .env) -replace '^JWT_SECRET=.*$', "JWT_SECRET=$jwtSecret" | Set-Content .env
+   ```
 
 3. Confirme no SQL Server que o modo de autenticação selecionado é **SQL Server e Windows**. Se precisar alterá-lo no SSMS, reinicie o serviço `SQL Server (SQLEXPRESS)`.
 
@@ -105,11 +113,13 @@ Teste real de integração com SQL Server:
 .\mvnw.cmd verify -Pintegration-test
 ```
 
-Os testes confirmam 31 cenários rápidos e 12 cenários de integração com o SQL Server, cobrindo o banco ativo (`nextask`), o login da aplicação (`nextask_app`) e os fluxos HTTP de usuários, workspaces, membros, projetos, tarefas e comentários.
+Os testes confirmam 35 cenários rápidos e 16 cenários de integração, cobrindo autenticação, emissão e validação de tokens, identidade autenticada, regras `OWNER`/`MEMBER` e os fluxos HTTP completos no SQL Server.
 
 ## Segurança local
 
 - `.env` nunca deve ser enviado ao GitHub.
+- `JWT_SECRET` deve conter pelo menos 32 bytes aleatórios codificados em Base64 e nunca deve ser publicado.
+- Tokens inválidos ou ausentes recebem `401`; operações sem permissão no workspace recebem `403`.
 - A aplicação não usa sua conta do Windows nem a conta administrativa `sa`.
 - `trustServerCertificate=true` é aceito somente no ambiente local; em produção será usado um certificado confiável.
 - O Hibernate está configurado com `ddl-auto=validate`, portanto não altera o schema silenciosamente.
@@ -123,6 +133,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [`docs/phase-3.md`](docs/phase-3.md): API REST, validação, erros e hash de senha;
 - [`docs/phase-4.md`](docs/phase-4.md): workspaces, membros, papéis e consistência transacional;
 - [`docs/phase-5.md`](docs/phase-5.md): projetos, tarefas, comentários e concorrência otimista.
+- [`docs/phase-6.md`](docs/phase-6.md): Spring Security, JWT, identidade autenticada e autorização.
 
 ## Roadmap resumido
 
@@ -134,7 +145,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] API de usuários
 - [x] Workspaces e permissões
 - [x] Projetos, tarefas e comentários
-- [ ] Spring Security e JWT
+- [x] Spring Security e JWT
 - [ ] Swagger/OpenAPI
 - [ ] React e quadro Kanban
 - [ ] Deploy

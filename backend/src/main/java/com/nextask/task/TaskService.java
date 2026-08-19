@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextask.api.PageResponse;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.entity.User;
 import com.nextask.project.ProjectRepository;
 import com.nextask.project.entity.Project;
@@ -31,23 +32,28 @@ public class TaskService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final WorkspaceMembershipValidator membershipValidator;
+    private final AuthenticatedUser authenticatedUser;
 
     public TaskService(
             TaskRepository taskRepository,
             ProjectRepository projectRepository,
             UserRepository userRepository,
-            WorkspaceMembershipValidator membershipValidator) {
+            WorkspaceMembershipValidator membershipValidator,
+            AuthenticatedUser authenticatedUser) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.membershipValidator = membershipValidator;
+        this.authenticatedUser = authenticatedUser;
     }
 
     @Transactional
     public TaskResponse create(Long projectId, CreateTaskRequest request) {
         Project project = findProject(projectId);
         Long workspaceId = project.getWorkspace().getId();
-        User creator = findMember(workspaceId, request.createdById());
+        Long currentUserId = authenticatedUser.id();
+        membershipValidator.requireAccess(workspaceId, currentUserId);
+        User creator = findUser(currentUserId);
         User assignee = request.assigneeId() == null
                 ? null
                 : findMember(workspaceId, request.assigneeId());
@@ -69,7 +75,10 @@ public class TaskService {
             TaskStatus status,
             int page,
             int size) {
-        findProject(projectId);
+        Project project = findProject(projectId);
+        membershipValidator.requireAccess(
+                project.getWorkspace().getId(),
+                authenticatedUser.id());
         PageRequest pageable = PageRequest.of(
                 page,
                 size,
@@ -82,12 +91,12 @@ public class TaskService {
     }
 
     public TaskResponse findById(Long taskId) {
-        return toResponse(findTask(taskId));
+        return toResponse(findTaskWithAccess(taskId));
     }
 
     @Transactional
     public TaskResponse update(Long taskId, UpdateTaskRequest request) {
-        Task task = findTask(taskId);
+        Task task = findTaskWithAccess(taskId);
         Long workspaceId = task.getProject().getWorkspace().getId();
         User assignee = request.assigneeId() == null
                 ? null
@@ -110,7 +119,7 @@ public class TaskService {
 
     @Transactional
     public void delete(Long taskId) {
-        Task task = findTask(taskId);
+        Task task = findTaskWithAccess(taskId);
         taskRepository.delete(task);
         taskRepository.flush();
     }
@@ -125,9 +134,21 @@ public class TaskService {
                 .orElseThrow(() -> new TaskNotFoundException(taskId));
     }
 
-    private User findMember(Long workspaceId, Long userId) {
-        User user = userRepository.findById(userId)
+    private Task findTaskWithAccess(Long taskId) {
+        Task task = findTask(taskId);
+        membershipValidator.requireAccess(
+                task.getProject().getWorkspace().getId(),
+                authenticatedUser.id());
+        return task;
+    }
+
+    private User findUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+    }
+
+    private User findMember(Long workspaceId, Long userId) {
+        User user = findUser(userId);
         membershipValidator.requireMember(workspaceId, userId);
         return user;
     }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextask.api.PageResponse;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.entity.User;
 import com.nextask.project.api.CreateProjectRequest;
 import com.nextask.project.api.ProjectResponse;
@@ -28,23 +29,27 @@ public class ProjectService {
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
     private final WorkspaceMembershipValidator membershipValidator;
+    private final AuthenticatedUser authenticatedUser;
 
     public ProjectService(
             ProjectRepository projectRepository,
             WorkspaceRepository workspaceRepository,
             UserRepository userRepository,
-            WorkspaceMembershipValidator membershipValidator) {
+            WorkspaceMembershipValidator membershipValidator,
+            AuthenticatedUser authenticatedUser) {
         this.projectRepository = projectRepository;
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.membershipValidator = membershipValidator;
+        this.authenticatedUser = authenticatedUser;
     }
 
     @Transactional
     public ProjectResponse create(Long workspaceId, CreateProjectRequest request) {
         Workspace workspace = findWorkspace(workspaceId);
-        User creator = findUser(request.createdById());
-        membershipValidator.requireMember(workspaceId, creator.getId());
+        Long userId = authenticatedUser.id();
+        membershipValidator.requireAccess(workspaceId, userId);
+        User creator = findUser(userId);
 
         Project project = new Project(
                 workspace,
@@ -56,6 +61,7 @@ public class ProjectService {
 
     public PageResponse<ProjectResponse> findAll(Long workspaceId, int page, int size) {
         findWorkspace(workspaceId);
+        membershipValidator.requireAccess(workspaceId, authenticatedUser.id());
         Page<ProjectResponse> projects = projectRepository.findByWorkspace_Id(
                         workspaceId,
                         PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id")))
@@ -64,19 +70,19 @@ public class ProjectService {
     }
 
     public ProjectResponse findById(Long projectId) {
-        return toResponse(findProject(projectId));
+        return toResponse(findProjectWithAccess(projectId));
     }
 
     @Transactional
     public ProjectResponse update(Long projectId, UpdateProjectRequest request) {
-        Project project = findProject(projectId);
+        Project project = findProjectWithAccess(projectId);
         project.edit(request.name(), request.description());
         return toResponse(projectRepository.saveAndFlush(project));
     }
 
     @Transactional
     public void delete(Long projectId) {
-        Project project = findProject(projectId);
+        Project project = findProjectWithAccess(projectId);
         projectRepository.delete(project);
         projectRepository.flush();
     }
@@ -94,6 +100,14 @@ public class ProjectService {
     private Project findProject(Long projectId) {
         return projectRepository.findById(projectId)
                 .orElseThrow(() -> new ProjectNotFoundException(projectId));
+    }
+
+    private Project findProjectWithAccess(Long projectId) {
+        Project project = findProject(projectId);
+        membershipValidator.requireAccess(
+                project.getWorkspace().getId(),
+                authenticatedUser.id());
+        return project;
     }
 
     private static ProjectResponse toResponse(Project project) {

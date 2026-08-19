@@ -20,6 +20,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.nextask.comment.CommentRepository;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.comment.CommentService;
 import com.nextask.comment.api.CommentResponse;
 import com.nextask.comment.api.CreateCommentRequest;
@@ -69,6 +70,9 @@ class CollaborationServiceTest {
     @Mock
     private WorkspaceMembershipValidator membershipValidator;
 
+    @Mock
+    private AuthenticatedUser authenticatedUser;
+
     private ProjectService projectService;
     private TaskService taskService;
     private CommentService commentService;
@@ -79,21 +83,25 @@ class CollaborationServiceTest {
                 projectRepository,
                 workspaceRepository,
                 userRepository,
-                membershipValidator);
+                membershipValidator,
+                authenticatedUser);
         taskService = new TaskService(
                 taskRepository,
                 projectRepository,
                 userRepository,
-                membershipValidator);
+                membershipValidator,
+                authenticatedUser);
         commentService = new CommentService(
                 commentRepository,
                 taskRepository,
                 userRepository,
-                membershipValidator);
+                membershipValidator,
+                authenticatedUser);
     }
 
     @Test
     void createsProjectOnlyForWorkspaceMember() {
+        when(authenticatedUser.id()).thenReturn(1L);
         Workspace workspace = workspace(10L);
         User creator = user(1L, "Ada");
         when(workspaceRepository.findById(10L)).thenReturn(Optional.of(workspace));
@@ -106,9 +114,9 @@ class CollaborationServiceTest {
 
         ProjectResponse response = projectService.create(
                 10L,
-                new CreateProjectRequest(" Product ", " ", 1L));
+                new CreateProjectRequest(" Product ", " "));
 
-        verify(membershipValidator).requireMember(10L, 1L);
+        verify(membershipValidator).requireAccess(10L, 1L);
         assertThat(response.id()).isEqualTo(20L);
         assertThat(response.name()).isEqualTo("Product");
         assertThat(response.description()).isNull();
@@ -116,6 +124,7 @@ class CollaborationServiceTest {
 
     @Test
     void createsTaskInTodoWithWorkspaceMembers() {
+        when(authenticatedUser.id()).thenReturn(1L);
         Workspace workspace = workspace(10L);
         User creator = user(1L, "Ada");
         User assignee = user(2L, "Grace");
@@ -137,10 +146,9 @@ class CollaborationServiceTest {
                         TaskPriority.HIGH,
                         3,
                         2L,
-                        1L,
                         null));
 
-        verify(membershipValidator).requireMember(10L, 1L);
+        verify(membershipValidator).requireAccess(10L, 1L);
         verify(membershipValidator).requireMember(10L, 2L);
         assertThat(response.status()).isEqualTo(TaskStatus.TODO);
         assertThat(response.priority()).isEqualTo(TaskPriority.HIGH);
@@ -150,6 +158,7 @@ class CollaborationServiceTest {
 
     @Test
     void rejectsTaskAssigneeOutsideWorkspace() {
+        when(authenticatedUser.id()).thenReturn(1L);
         Workspace workspace = workspace(10L);
         User creator = user(1L, "Ada");
         User outsider = user(2L, "Outsider");
@@ -157,8 +166,6 @@ class CollaborationServiceTest {
         when(projectRepository.findById(20L)).thenReturn(Optional.of(project));
         when(userRepository.findById(1L)).thenReturn(Optional.of(creator));
         when(userRepository.findById(2L)).thenReturn(Optional.of(outsider));
-        org.mockito.Mockito.doNothing()
-                .when(membershipValidator).requireMember(10L, 1L);
         org.mockito.Mockito.doThrow(new UserMustBelongToWorkspaceException(10L, 2L))
                 .when(membershipValidator).requireMember(10L, 2L);
 
@@ -170,7 +177,6 @@ class CollaborationServiceTest {
                         TaskPriority.MEDIUM,
                         0,
                         2L,
-                        1L,
                         null)))
                 .isInstanceOf(UserMustBelongToWorkspaceException.class);
 
@@ -179,6 +185,7 @@ class CollaborationServiceTest {
 
     @Test
     void createsCommentOnlyForWorkspaceMember() {
+        when(authenticatedUser.id()).thenReturn(2L);
         Workspace workspace = workspace(10L);
         User creator = user(1L, "Ada");
         User author = user(2L, "Grace");
@@ -194,15 +201,16 @@ class CollaborationServiceTest {
 
         CommentResponse response = commentService.create(
                 30L,
-                new CreateCommentRequest(" Looks good ", 2L));
+                new CreateCommentRequest(" Looks good "));
 
-        verify(membershipValidator).requireMember(10L, 2L);
+        verify(membershipValidator).requireAccess(10L, 2L);
         assertThat(response.content()).isEqualTo("Looks good");
         assertThat(response.authorName()).isEqualTo("Grace");
     }
 
     @Test
     void reportsConcurrentTaskUpdate() {
+        when(authenticatedUser.id()).thenReturn(1L);
         Workspace workspace = workspace(10L);
         User creator = user(1L, "Ada");
         Project project = project(20L, workspace, creator);

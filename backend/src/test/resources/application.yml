@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: nextask
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://localhost;instanceName=SQLEXPRESS;databaseName=nextask;encrypt=true;trustServerCertificate=true}
+    username: ${DB_USERNAME:nextask_app}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+nextask:
+  security:
+    jwt:
+      secret: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+      issuer: nextask-test
+      access-token-ttl: PT5M

@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,6 +30,7 @@ import com.nextask.workspace.entity.WorkspaceRole;
 import com.nextask.workspace.error.WorkspaceMustHaveOwnerException;
 
 @WebMvcTest(WorkspaceController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class WorkspaceControllerTest {
 
     private static final OffsetDateTime TIMESTAMP = OffsetDateTime.of(
@@ -52,7 +54,7 @@ class WorkspaceControllerTest {
                 TIMESTAMP);
         when(workspaceService.create(any(CreateWorkspaceRequest.class))).thenReturn(response);
 
-        CreateWorkspaceRequest request = new CreateWorkspaceRequest("Product Team", 7L);
+        CreateWorkspaceRequest request = new CreateWorkspaceRequest("Product Team");
 
         mockMvc.perform(post("/api/workspaces")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -66,7 +68,7 @@ class WorkspaceControllerTest {
 
     @Test
     void validatesWorkspaceCreation() throws Exception {
-        CreateWorkspaceRequest request = new CreateWorkspaceRequest(" ", null);
+        CreateWorkspaceRequest request = new CreateWorkspaceRequest(" ");
 
         mockMvc.perform(post("/api/workspaces")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,8 +77,7 @@ class WorkspaceControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type")
                         .value("urn:nextask:problem:validation-failed"))
-                .andExpect(jsonPath("$.errors.name").value("name is required"))
-                .andExpect(jsonPath("$.errors.ownerId").value("ownerId is required"));
+                .andExpect(jsonPath("$.errors.name").value("name is required"));
     }
 
     @Test

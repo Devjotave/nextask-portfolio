@@ -1,32 +1,39 @@
 package com.nextask.user;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nextask.user.api.CreateUserRequest;
+import com.nextask.auth.AuthenticatedUser;
+import com.nextask.user.api.UpdateUserRequest;
 import com.nextask.user.api.UserResponse;
-import com.nextask.user.error.EmailAlreadyInUseException;
 import com.nextask.user.error.UserNotFoundException;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class UserControllerTest {
+
+    private static final OffsetDateTime TIMESTAMP = OffsetDateTime.of(
+            2026, 8, 19, 12, 0, 0, 0, ZoneOffset.UTC);
 
     @Autowired
     private MockMvc mockMvc;
@@ -37,28 +44,20 @@ class UserControllerTest {
     @MockitoBean
     private UserService userService;
 
+    @MockitoBean
+    private AuthenticatedUser authenticatedUser;
+
+    @BeforeEach
+    void setUp() {
+        when(authenticatedUser.id()).thenReturn(7L);
+    }
+
     @Test
-    void createsUserWithoutExposingPasswordData() throws Exception {
-        OffsetDateTime timestamp = OffsetDateTime.of(
-                2026, 8, 18, 12, 0, 0, 0, ZoneOffset.UTC);
-        UserResponse response = new UserResponse(
-                7L,
-                "Ada Lovelace",
-                "ada@example.com",
-                timestamp,
-                timestamp);
-        when(userService.create(any(CreateUserRequest.class))).thenReturn(response);
+    void returnsAuthenticatedUserWithoutPasswordData() throws Exception {
+        when(userService.findById(7L)).thenReturn(userResponse());
 
-        CreateUserRequest request = new CreateUserRequest(
-                "Ada Lovelace",
-                "ada@example.com",
-                "a-secure-password");
-
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(request)))
-                .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/api/users/7"))
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.email").value("ada@example.com"))
@@ -67,49 +66,41 @@ class UserControllerTest {
     }
 
     @Test
-    void returnsProblemDetailForInvalidRequest() throws Exception {
-        CreateUserRequest request = new CreateUserRequest(" ", "invalid", "short");
+    void updatesOnlyAuthenticatedUser() throws Exception {
+        UpdateUserRequest request = new UpdateUserRequest("Ada", "ada@example.com");
+        when(userService.update(org.mockito.ArgumentMatchers.eq(7L), any(UpdateUserRequest.class)))
+                .thenReturn(userResponse());
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(put("/api/users/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value("urn:nextask:problem:validation-failed"))
-                .andExpect(jsonPath("$.title").value("Validation failed"))
-                .andExpect(jsonPath("$.errors.name").value("name is required"))
-                .andExpect(jsonPath("$.errors.email").value("email must be valid"))
-                .andExpect(jsonPath("$.errors.password")
-                        .value("password must have between 8 and 128 characters"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7));
+
+        verify(userService).update(
+                org.mockito.ArgumentMatchers.eq(7L),
+                any(UpdateUserRequest.class));
     }
 
     @Test
-    void returnsConflictForDuplicateEmail() throws Exception {
-        when(userService.create(any(CreateUserRequest.class)))
-                .thenThrow(new EmailAlreadyInUseException());
+    void deletesOnlyAuthenticatedUser() throws Exception {
+        mockMvc.perform(delete("/api/users/me"))
+                .andExpect(status().isNoContent());
 
-        CreateUserRequest request = new CreateUserRequest(
-                "Ada Lovelace",
-                "ada@example.com",
-                "a-secure-password");
-
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(request)))
-                .andExpect(status().isConflict())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type")
-                        .value("urn:nextask:problem:email-already-in-use"));
+        verify(userService).delete(7L);
     }
 
     @Test
-    void returnsNotFoundForUnknownUser() throws Exception {
-        when(userService.findById(404L)).thenThrow(new UserNotFoundException(404L));
+    void returnsNotFoundWhenTokenUserNoLongerExists() throws Exception {
+        when(userService.findById(7L)).thenThrow(new UserNotFoundException(7L));
 
-        mockMvc.perform(get("/api/users/404"))
+        mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value("urn:nextask:problem:user-not-found"))
-                .andExpect(jsonPath("$.detail").value("User 404 was not found"));
+                .andExpect(jsonPath("$.type").value("urn:nextask:problem:user-not-found"));
+    }
+
+    private static UserResponse userResponse() {
+        return new UserResponse(7L, "Ada", "ada@example.com", TIMESTAMP, TIMESTAMP);
     }
 }

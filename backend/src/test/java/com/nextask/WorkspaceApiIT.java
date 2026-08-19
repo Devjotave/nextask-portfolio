@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,8 +26,10 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nextask.auth.JwtTokenService;
 import com.nextask.entity.User;
 import com.nextask.user.UserRepository;
+import com.nextask.user.api.UserResponse;
 import com.nextask.workspace.api.AddWorkspaceMemberRequest;
 import com.nextask.workspace.api.CreateWorkspaceRequest;
 import com.nextask.workspace.api.UpdateWorkspaceMemberRequest;
@@ -52,6 +55,9 @@ class WorkspaceApiIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private JwtTokenService tokenService;
+
     @AfterEach
     void removeCreatedData() {
         createdWorkspaceIds.forEach(workspaceId -> jdbcTemplate.update(
@@ -63,19 +69,21 @@ class WorkspaceApiIT {
     }
 
     @Test
-    void createsWorkspaceWithOwnerAndListsItForThatUser() throws Exception {
+    void createsWorkspaceWithAuthenticatedOwnerAndListsIt() throws Exception {
         User owner = createUser("Workspace Owner");
-        long workspaceId = createWorkspace("Product Team", owner.getId());
+        String ownerToken = tokenFor(owner);
+        long workspaceId = createWorkspace("Product Team", ownerToken);
 
         mockMvc.perform(get("/api/workspaces")
-                        .param("userId", owner.getId().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(workspaceId))
                 .andExpect(jsonPath("$.content[0].name").value("Product Team"))
                 .andExpect(jsonPath("$.content[0].role").value("OWNER"));
 
-        mockMvc.perform(get("/api/workspaces/{workspaceId}/members", workspaceId))
+        mockMvc.perform(get("/api/workspaces/{workspaceId}/members", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].userId").value(owner.getId()))
@@ -83,15 +91,18 @@ class WorkspaceApiIT {
     }
 
     @Test
-    void preservesAnOwnerWhileMembershipsChange() throws Exception {
+    void preservesAnOwnerWhileOwnerManagesMemberships() throws Exception {
         User owner = createUser("Original Owner");
         User member = createUser("Future Owner");
-        long workspaceId = createWorkspace("Engineering", owner.getId());
+        String ownerToken = tokenFor(owner);
+        String memberToken = tokenFor(member);
+        long workspaceId = createWorkspace("Engineering", ownerToken);
 
         AddWorkspaceMemberRequest addRequest = new AddWorkspaceMemberRequest(
                 member.getId(),
                 WorkspaceRole.MEMBER);
         mockMvc.perform(post("/api/workspaces/{workspaceId}/members", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(addRequest)))
                 .andExpect(status().isCreated())
@@ -100,7 +111,8 @@ class WorkspaceApiIT {
         mockMvc.perform(delete(
                         "/api/workspaces/{workspaceId}/members/{userId}",
                         workspaceId,
-                        owner.getId()))
+                        owner.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type")
                         .value("urn:nextask:problem:workspace-must-have-owner"));
@@ -111,6 +123,7 @@ class WorkspaceApiIT {
                         "/api/workspaces/{workspaceId}/members/{userId}",
                         workspaceId,
                         member.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(promote)))
                 .andExpect(status().isOk())
@@ -119,10 +132,12 @@ class WorkspaceApiIT {
         mockMvc.perform(delete(
                         "/api/workspaces/{workspaceId}/members/{userId}",
                         workspaceId,
-                        owner.getId()))
+                        owner.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/workspaces/{workspaceId}/members", workspaceId))
+        mockMvc.perform(get("/api/workspaces/{workspaceId}/members", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(memberToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].userId").value(member.getId()))
@@ -130,22 +145,57 @@ class WorkspaceApiIT {
     }
 
     @Test
+    void memberCanReadButCannotManageWorkspace() throws Exception {
+        User owner = createUser("Owner");
+        User member = createUser("Member");
+        String ownerToken = tokenFor(owner);
+        String memberToken = tokenFor(member);
+        long workspaceId = createWorkspace("Protected", ownerToken);
+
+        AddWorkspaceMemberRequest addRequest = new AddWorkspaceMemberRequest(
+                member.getId(),
+                WorkspaceRole.MEMBER);
+        mockMvc.perform(post("/api/workspaces/{workspaceId}/members", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(addRequest)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/workspaces/{workspaceId}", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(memberToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/workspaces/{workspaceId}", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(memberToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(
+                                new UpdateWorkspaceRequest("Forbidden rename"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:nextask:problem:workspace-access-denied"));
+    }
+
+    @Test
     void updatesAndDeletesWorkspaceWithItsMemberships() throws Exception {
         User owner = createUser("Temporary Owner");
-        long workspaceId = createWorkspace("Temporary", owner.getId());
+        String ownerToken = tokenFor(owner);
+        long workspaceId = createWorkspace("Temporary", ownerToken);
         UpdateWorkspaceRequest update = new UpdateWorkspaceRequest("Renamed Workspace");
 
         mockMvc.perform(put("/api/workspaces/{workspaceId}", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(update)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Renamed Workspace"));
 
-        mockMvc.perform(delete("/api/workspaces/{workspaceId}", workspaceId))
+        mockMvc.perform(delete("/api/workspaces/{workspaceId}", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
-        mockMvc.perform(get("/api/workspaces/{workspaceId}", workspaceId))
+        mockMvc.perform(get("/api/workspaces/{workspaceId}", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isNotFound());
 
         Integer membershipCount = jdbcTemplate.queryForObject(
@@ -156,26 +206,29 @@ class WorkspaceApiIT {
     }
 
     @Test
-    void rejectsDeletingUserThatStillBelongsToWorkspace() throws Exception {
+    void rejectsDeletingAuthenticatedUserThatStillBelongsToWorkspace() throws Exception {
         User owner = createUser("Protected Owner");
-        createWorkspace("Protected Workspace", owner.getId());
+        String ownerToken = tokenFor(owner);
+        createWorkspace("Protected Workspace", ownerToken);
 
-        mockMvc.perform(delete("/api/users/{id}", owner.getId()))
+        mockMvc.perform(delete("/api/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type")
                         .value("urn:nextask:problem:user-has-workspace-memberships"));
     }
 
     private User createUser(String name) {
-        String email = "phase4-" + UUID.randomUUID() + "@example.com";
+        String email = "phase6-workspace-" + UUID.randomUUID() + "@example.com";
         User user = userRepository.saveAndFlush(new User(name, email, "encoded-password"));
         createdUserIds.add(user.getId());
         return user;
     }
 
-    private long createWorkspace(String name, Long ownerId) throws Exception {
-        CreateWorkspaceRequest request = new CreateWorkspaceRequest(name, ownerId);
+    private long createWorkspace(String name, String ownerToken) throws Exception {
+        CreateWorkspaceRequest request = new CreateWorkspaceRequest(name);
         MvcResult creation = mockMvc.perform(post("/api/workspaces")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isCreated())
@@ -185,5 +238,19 @@ class WorkspaceApiIT {
         long workspaceId = response.get("id").asLong();
         createdWorkspaceIds.add(workspaceId);
         return workspaceId;
+    }
+
+    private String tokenFor(User user) {
+        UserResponse response = new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getCreatedAt(),
+                user.getUpdatedAt());
+        return tokenService.issue(response).accessToken();
+    }
+
+    private static String bearer(String token) {
+        return "Bearer " + token;
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextask.api.PageResponse;
+import com.nextask.auth.AuthenticatedUser;
 import com.nextask.comment.api.CommentResponse;
 import com.nextask.comment.api.CreateCommentRequest;
 import com.nextask.comment.api.UpdateCommentRequest;
@@ -28,32 +29,39 @@ public class CommentService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final WorkspaceMembershipValidator membershipValidator;
+    private final AuthenticatedUser authenticatedUser;
 
     public CommentService(
             CommentRepository commentRepository,
             TaskRepository taskRepository,
             UserRepository userRepository,
-            WorkspaceMembershipValidator membershipValidator) {
+            WorkspaceMembershipValidator membershipValidator,
+            AuthenticatedUser authenticatedUser) {
         this.commentRepository = commentRepository;
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.membershipValidator = membershipValidator;
+        this.authenticatedUser = authenticatedUser;
     }
 
     @Transactional
     public CommentResponse create(Long taskId, CreateCommentRequest request) {
         Task task = findTask(taskId);
         Long workspaceId = task.getProject().getWorkspace().getId();
-        User author = userRepository.findById(request.authorId())
-                .orElseThrow(() -> new UserNotFoundException(request.authorId()));
-        membershipValidator.requireMember(workspaceId, author.getId());
+        Long userId = authenticatedUser.id();
+        membershipValidator.requireAccess(workspaceId, userId);
+        User author = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
         Comment comment = new Comment(task, author, request.content());
         return toResponse(commentRepository.saveAndFlush(comment));
     }
 
     public PageResponse<CommentResponse> findAll(Long taskId, int page, int size) {
-        findTask(taskId);
+        Task task = findTask(taskId);
+        membershipValidator.requireAccess(
+                task.getProject().getWorkspace().getId(),
+                authenticatedUser.id());
         Page<CommentResponse> comments = commentRepository.findByTask_Id(
                         taskId,
                         PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id")))
@@ -64,6 +72,7 @@ public class CommentService {
     @Transactional
     public CommentResponse update(Long commentId, UpdateCommentRequest request) {
         Comment comment = findComment(commentId);
+        requireAuthorOrOwner(comment);
         comment.edit(request.content());
         return toResponse(commentRepository.saveAndFlush(comment));
     }
@@ -71,6 +80,7 @@ public class CommentService {
     @Transactional
     public void delete(Long commentId) {
         Comment comment = findComment(commentId);
+        requireAuthorOrOwner(comment);
         commentRepository.delete(comment);
         commentRepository.flush();
     }
@@ -83,6 +93,14 @@ public class CommentService {
     private Comment findComment(Long commentId) {
         return commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException(commentId));
+    }
+
+    private void requireAuthorOrOwner(Comment comment) {
+        Long workspaceId = comment.getTask().getProject().getWorkspace().getId();
+        membershipValidator.requireSelfOrOwner(
+                workspaceId,
+                authenticatedUser.id(),
+                comment.getAuthor().getId());
     }
 
     private static CommentResponse toResponse(Comment comment) {

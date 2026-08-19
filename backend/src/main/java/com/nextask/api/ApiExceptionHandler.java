@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,6 +24,7 @@ import com.nextask.user.error.EmailAlreadyInUseException;
 import com.nextask.user.error.UserHasWorkspaceMembershipsException;
 import com.nextask.user.error.UserNotFoundException;
 import com.nextask.workspace.error.UserMustBelongToWorkspaceException;
+import com.nextask.workspace.error.WorkspaceAccessDeniedException;
 import com.nextask.workspace.error.WorkspaceMemberAlreadyExistsException;
 import com.nextask.workspace.error.WorkspaceMemberNotFoundException;
 import com.nextask.workspace.error.WorkspaceMustHaveOwnerException;
@@ -43,7 +45,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI TASK_NOT_FOUND = URI.create("urn:nextask:problem:task-not-found");
     private static final URI COMMENT_NOT_FOUND = URI.create("urn:nextask:problem:comment-not-found");
     private static final URI TASK_CONCURRENT_UPDATE = URI.create("urn:nextask:problem:task-concurrent-update");
+    private static final URI AUTHENTICATION_FAILED = URI.create("urn:nextask:problem:authentication-failed");
+    private static final URI WORKSPACE_ACCESS_DENIED = URI.create("urn:nextask:problem:workspace-access-denied");
     private static final URI VALIDATION_FAILED = URI.create("urn:nextask:problem:validation-failed");
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED,
+                "Email or password is incorrect");
+        problem.setType(AUTHENTICATION_FAILED);
+        problem.setTitle("Authentication failed");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
+    }
 
     @ExceptionHandler(UserNotFoundException.class)
     ResponseEntity<ProblemDetail> handleUserNotFound(UserNotFoundException exception) {
@@ -107,6 +121,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.CONFLICT,
                 USER_MUST_BELONG_TO_WORKSPACE,
                 "User must belong to workspace",
+                exception);
+    }
+
+    @ExceptionHandler(WorkspaceAccessDeniedException.class)
+    ResponseEntity<ProblemDetail> handleWorkspaceAccessDenied(
+            WorkspaceAccessDeniedException exception) {
+        return problem(
+                HttpStatus.FORBIDDEN,
+                WORKSPACE_ACCESS_DENIED,
+                "Workspace access denied",
                 exception);
     }
 
