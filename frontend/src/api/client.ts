@@ -60,6 +60,20 @@ export async function apiRequest<T>(
   return (await readJson(response)) as T
 }
 
+export function authenticatedRequest<T>(
+  token: string,
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const headers = new Headers(options.headers)
+  headers.set('Authorization', `Bearer ${token}`)
+
+  return apiRequest<T>(path, {
+    ...options,
+    headers,
+  })
+}
+
 export function readableError(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message

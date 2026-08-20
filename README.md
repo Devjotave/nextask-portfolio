@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 8 concluída: frontend React com cadastro, login, sessão JWT e navegação protegida.
+Em desenvolvimento — Fase 9 concluída: frontend React com workspaces, projetos, criação de tarefas e quadro Kanban responsivo.
 
 ## Objetivo
 
@@ -44,7 +44,7 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - Vitest + Testing Library
 - pnpm 11
 
-O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. O frontend consome os contratos de autenticação, protege a área interna e mantém a sessão somente na aba atual do navegador.
+O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. O frontend mantém a sessão somente na aba atual, consome workspaces, projetos e tarefas reais e oferece um quadro Kanban com movimentação acessível entre estados.
 
 ## Pré-requisitos
 
@@ -94,9 +94,17 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
 5. Execute o backend:
 
    ```powershell
+   Get-Content .env |
+       Where-Object { $_ -match '^[^#][^=]*=' } |
+       ForEach-Object {
+           $entry = $_ -split '=', 2
+           [Environment]::SetEnvironmentVariable($entry[0].Trim(), $entry[1], 'Process')
+       }
    Set-Location backend
    .\mvnw.cmd spring-boot:run
    ```
+
+   As variáveis são carregadas apenas nesse PowerShell e seus valores não são exibidos na tela.
 
 6. Em outro terminal, consulte a saúde da aplicação:
 
@@ -124,7 +132,7 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
    http://localhost:5173
    ```
 
-   O Vite encaminha chamadas `/api` para `http://localhost:8080`, portanto o backend deve continuar ligado. Use a tela para criar uma conta ou entrar; após a autenticação, a rota `/app` é liberada.
+   O Vite encaminha chamadas `/api` para `http://localhost:8080`, portanto o backend deve continuar ligado. Use a tela para criar uma conta ou entrar; após a autenticação, a rota `/app` permite criar o primeiro workspace, projeto e tarefas do quadro Kanban.
 
 9. Abra a documentação interativa do backend quando precisar inspecionar os contratos:
 
@@ -160,7 +168,7 @@ pnpm test
 pnpm build
 ```
 
-O frontend possui 9 testes automatizados para rotas protegidas, login, erros da API, confirmação de senha, restauração e encerramento da sessão. O build também executa a verificação estrita de tipos do TypeScript.
+O frontend possui 12 testes automatizados para rotas protegidas, autenticação, sessão, onboarding de workspace e projeto, criação e movimentação de tarefas, erros da API e expiração da autenticação. O build também executa a verificação estrita de tipos do TypeScript.
 
 ## Segurança local
 
@@ -186,6 +194,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [`docs/phase-6.md`](docs/phase-6.md): Spring Security, JWT, identidade autenticada e autorização.
 - [`docs/phase-7.md`](docs/phase-7.md): contrato OpenAPI, Swagger UI e testes da documentação.
 - [`docs/phase-8.md`](docs/phase-8.md): React, autenticação, sessão no navegador, rotas e testes do frontend.
+- [`docs/phase-9.md`](docs/phase-9.md): workspaces, projetos, tarefas e primeiro quadro Kanban.
 
 ## Roadmap resumido
 
@@ -200,5 +209,6 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] Spring Security e JWT
 - [x] Swagger/OpenAPI
 - [x] React, autenticação e navegação protegida
-- [ ] Workspaces e quadro Kanban
+- [x] Workspaces e primeiro quadro Kanban
+- [ ] Detalhes de tarefas, comentários e membros no frontend
 - [ ] Deploy
