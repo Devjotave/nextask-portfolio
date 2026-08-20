@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Preparar Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Autorizar o Maven Wrapper
+        run: chmod +x mvnw
+
+      - name: Testar o backend
+        run: ./mvnw -B -ntp test
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Preparar pnpm e Node.js
+        uses: pnpm/setup@v2
+        with:
+          version: 11.19.0
+          runtime: node@24
+          cache: true
+          cache-dependency-path: frontend/pnpm-lock.yaml
+          package-json-file: frontend/package.json
+          install: false
+
+      - name: Instalar dependências
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Analisar o código
+        working-directory: frontend
+        run: pnpm lint
+
+      - name: Testar o frontend
+        working-directory: frontend
+        run: pnpm test
+
+      - name: Gerar o frontend de produção
+        working-directory: frontend
+        run: pnpm build
+
+  containers:
+    name: Imagens de produção
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - backend
+      - frontend
+    env:
+      MSSQL_SA_PASSWORD: CI_StrongAdminPassword_456!
+      DB_PASSWORD: CI_StrongAppPassword_123!
+      JWT_SECRET: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Validar a composição
+        run: docker compose config --quiet
+
+      - name: Construir a imagem do backend
+        run: docker build --tag nextask-backend:ci ./backend
+
+      - name: Construir a imagem do frontend
+        run: docker build --tag nextask-frontend:ci ./frontend

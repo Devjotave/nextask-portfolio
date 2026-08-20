@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 10 concluída: colaboração no frontend com detalhes de tarefas, responsáveis, comentários e membros.
+Em desenvolvimento — Fase 11 concluída: imagens de produção, execução integrada com Docker Compose e integração contínua no GitHub.
 
 ## Objetivo
 
@@ -13,13 +13,15 @@ O NexTask será uma aplicação web para gerenciamento colaborativo de projetos 
 ## Arquitetura inicial
 
 ```text
-React 19 + TypeScript
-         ↓ /api
-  Spring Boot 3 REST
-         ↓
-   Spring Data JPA
-         ↓
-Microsoft SQL Server
+       Navegador
+           ↓
+    NGINX + React
+           ↓ /api
+   Spring Boot 3 REST
+           ↓
+    Spring Data JPA
+           ↓
+ Microsoft SQL Server
 ```
 
 O backend começa como um monólito modular em camadas. Os packages de cada módulo serão criados apenas quando a respectiva funcionalidade for implementada; Git não versiona diretórios vazios.
@@ -43,6 +45,9 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - React Router 7
 - Vitest + Testing Library
 - pnpm 11
+- Docker + Docker Compose
+- NGINX sem privilégios de administrador
+- GitHub Actions + Dependabot
 
 O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. O frontend mantém a sessão somente na aba atual, oferece um quadro Kanban com movimentação acessível e integra detalhes de tarefas, responsáveis, comentários e gestão de membros.
 
@@ -56,6 +61,7 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
 - SQL Server Express com a instância `SQLEXPRESS`
 - SQL Server Management Studio (SSMS) ou o utilitário `sqlcmd`
 - IDE com suporte a Java (IntelliJ IDEA, Eclipse/STS ou VS Code)
+- Docker Desktop, opcional para executar toda a aplicação em contêineres
 
 ## Executar localmente
 
@@ -142,6 +148,38 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
 
    Use `POST /api/auth/register` ou `POST /api/auth/login`, copie apenas o valor de `accessToken` e informe-o no botão **Authorize**. A interface adiciona o prefixo `Bearer` automaticamente.
 
+## Executar com Docker
+
+Esta opção inicia frontend, backend e um SQL Server isolado com um único comando. Ela não usa nem altera a instância `SQLEXPRESS` instalada no Windows.
+
+1. Com o Docker Desktop aberto, gere os segredos locais:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-compose-env.ps1
+   ```
+
+   O script cria `.env.compose` com valores aleatórios, não mostra as senhas na tela e se recusa a substituir um arquivo existente.
+
+2. Construa e inicie a aplicação:
+
+   ```powershell
+   docker compose --env-file .env.compose up --build
+   ```
+
+3. Aguarde os serviços ficarem saudáveis e abra:
+
+   ```text
+   http://localhost:8080
+   ```
+
+4. Para encerrar, pressione `Ctrl+C` e execute:
+
+   ```powershell
+   docker compose --env-file .env.compose down
+   ```
+
+O banco fica preservado no volume `nextask_sqlserver-data`. O Swagger permanece desabilitado no perfil de produção; para habilitá-lo temporariamente, altere `OPENAPI_ENABLED` para `true` em `.env.compose` e reinicie os serviços.
+
 ## Testes
 
 Teste rápido, sem depender do banco:
@@ -170,9 +208,14 @@ pnpm build
 
 O frontend possui 14 testes automatizados para rotas protegidas, autenticação, sessão, onboarding, Kanban, detalhes e responsáveis, comentários, membros, erros da API e expiração da autenticação. O build também executa a verificação estrita de tipos do TypeScript.
 
+## Integração contínua
+
+O workflow em `.github/workflows/ci.yml` é executado automaticamente em cada envio para `main` e em pull requests. Ele testa o backend, analisa, testa e compila o frontend, valida o Docker Compose e constrói as duas imagens de produção. O Dependabot verifica semanalmente atualizações das ações e imagens Docker.
+
 ## Segurança local
 
 - `.env` nunca deve ser enviado ao GitHub.
+- `.env.compose` também é privado e nunca deve ser enviado ao GitHub.
 - `JWT_SECRET` deve conter pelo menos 32 bytes aleatórios codificados em Base64 e nunca deve ser publicado.
 - Tokens inválidos ou ausentes recebem `401`; operações sem permissão no workspace recebem `403`.
 - A documentação fica ativa por padrão no ambiente local e pode ser desabilitada com `OPENAPI_ENABLED=false`.
@@ -196,6 +239,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [`docs/phase-8.md`](docs/phase-8.md): React, autenticação, sessão no navegador, rotas e testes do frontend.
 - [`docs/phase-9.md`](docs/phase-9.md): workspaces, projetos, tarefas e primeiro quadro Kanban.
 - [`docs/phase-10.md`](docs/phase-10.md): detalhes de tarefas, responsáveis, comentários e membros.
+- [`docs/phase-11.md`](docs/phase-11.md): imagens de produção, Docker Compose e integração contínua.
 
 ## Roadmap resumido
 
@@ -212,4 +256,5 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] React, autenticação e navegação protegida
 - [x] Workspaces e primeiro quadro Kanban
 - [x] Detalhes de tarefas, comentários e membros no frontend
-- [ ] Deploy
+- [x] Preparação reproduzível para deploy e integração contínua
+- [ ] Publicação em uma plataforma de hospedagem

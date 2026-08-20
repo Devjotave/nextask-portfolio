@@ -1,0 +1,78 @@
+name: nextask
+
+services:
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Configure MSSQL_SA_PASSWORD}
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa
+          -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  database-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Configure MSSQL_SA_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+    volumes:
+      - ./database/init-database.sql:/scripts/init-database.sql:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - -c
+      - >-
+        /opt/mssql-tools18/bin/sqlcmd -S database -U sa
+        -P "$${MSSQL_SA_PASSWORD}" -C -b
+        -v DB_PASSWORD="$${DB_PASSWORD}"
+        -i /scripts/init-database.sql
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      DB_URL: jdbc:sqlserver://database:1433;databaseName=nextask;encrypt=true;trustServerCertificate=true
+      DB_USERNAME: nextask_app
+      DB_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-nextask-api}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-PT1H}
+      OPENAPI_ENABLED: ${OPENAPI_ENABLED:-false}
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  sqlserver-data:

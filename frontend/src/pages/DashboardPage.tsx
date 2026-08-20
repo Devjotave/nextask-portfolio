@@ -396,8 +396,8 @@ export function DashboardPage() {
         </div>
 
         <div className="sidebar__phase">
-          <span>Fase 10</span>
-          <strong>Colaboração ativa</strong>
+          <span>Fase 11</span>
+          <strong>Pronto para deploy</strong>
           <div className="phase-progress" aria-label="Progresso da fase concluído">
             <span />
           </div>
