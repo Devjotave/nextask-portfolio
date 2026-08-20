@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 6 concluída: autenticação, JWT e autorização por workspace.
+Em desenvolvimento — Fase 7 concluída: contrato OpenAPI e Swagger UI autenticável.
 
 ## Objetivo
 
@@ -36,11 +36,12 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - Bean Validation
 - Spring Security / PBKDF2
 - OAuth2 Resource Server / JWT
+- Springdoc OpenAPI / Swagger UI
 - Spring Boot Actuator
 - Microsoft SQL Server 2022 Express
 - JUnit 5
 
-O backend possui autenticação stateless com tokens JWT assinados por HMAC. Swagger e React entram nas próximas fases, junto com código e testes que justifiquem essas dependências.
+O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. React entra nas próximas fases, junto com código e testes que justifiquem suas dependências.
 
 ## Pré-requisitos
 
@@ -98,6 +99,14 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC. Swa
    {"status":"UP"}
    ```
 
+7. Abra a documentação interativa:
+
+   ```text
+   http://localhost:8080/swagger-ui.html
+   ```
+
+   Use `POST /api/auth/register` ou `POST /api/auth/login`, copie apenas o valor de `accessToken` e informe-o no botão **Authorize**. A interface adiciona o prefixo `Bearer` automaticamente.
+
 ## Testes
 
 Teste rápido, sem depender do banco:
@@ -113,13 +122,14 @@ Teste real de integração com SQL Server:
 .\mvnw.cmd verify -Pintegration-test
 ```
 
-Os testes confirmam 35 cenários rápidos e 16 cenários de integração, cobrindo autenticação, emissão e validação de tokens, identidade autenticada, regras `OWNER`/`MEMBER` e os fluxos HTTP completos no SQL Server.
+Os testes confirmam 37 cenários rápidos e 16 cenários de integração, cobrindo autenticação, emissão e validação de tokens, identidade autenticada, documentação OpenAPI, regras `OWNER`/`MEMBER` e os fluxos HTTP completos no SQL Server.
 
 ## Segurança local
 
 - `.env` nunca deve ser enviado ao GitHub.
 - `JWT_SECRET` deve conter pelo menos 32 bytes aleatórios codificados em Base64 e nunca deve ser publicado.
 - Tokens inválidos ou ausentes recebem `401`; operações sem permissão no workspace recebem `403`.
+- A documentação fica ativa por padrão no ambiente local e pode ser desabilitada com `OPENAPI_ENABLED=false`.
 - A aplicação não usa sua conta do Windows nem a conta administrativa `sa`.
 - `trustServerCertificate=true` é aceito somente no ambiente local; em produção será usado um certificado confiável.
 - O Hibernate está configurado com `ddl-auto=validate`, portanto não altera o schema silenciosamente.
@@ -134,6 +144,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [`docs/phase-4.md`](docs/phase-4.md): workspaces, membros, papéis e consistência transacional;
 - [`docs/phase-5.md`](docs/phase-5.md): projetos, tarefas, comentários e concorrência otimista.
 - [`docs/phase-6.md`](docs/phase-6.md): Spring Security, JWT, identidade autenticada e autorização.
+- [`docs/phase-7.md`](docs/phase-7.md): contrato OpenAPI, Swagger UI e testes da documentação.
 
 ## Roadmap resumido
 
@@ -146,6 +157,6 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] Workspaces e permissões
 - [x] Projetos, tarefas e comentários
 - [x] Spring Security e JWT
-- [ ] Swagger/OpenAPI
+- [x] Swagger/OpenAPI
 - [ ] React e quadro Kanban
 - [ ] Deploy
