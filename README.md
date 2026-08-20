@@ -10,6 +10,24 @@ Em desenvolvimento — Fase 11 concluída: imagens de produção, execução int
 
 O NexTask será uma aplicação web para gerenciamento colaborativo de projetos e tarefas. O projeto é construído de forma incremental como portfólio profissional, priorizando aprendizado, segurança, testes e decisões arquiteturais justificadas.
 
+## Demonstração
+
+### Quadro Kanban
+
+Organização visual de tarefas por status, com prioridades, prazos e movimentação entre colunas.
+
+[![Quadro Kanban do NexTask](docs/images/nextask-kanban.png)](docs/images/nextask-kanban.png)
+
+### Detalhes e colaboração
+
+Edição completa da tarefa, responsável, prazo e comentários com autoria e moderação.
+
+[![Painel de detalhes e comentários de uma tarefa](docs/images/nextask-task-details.png)](docs/images/nextask-task-details.png)
+
+| Autenticação protegida por JWT | Gestão de membros e papéis |
+| --- | --- |
+| [![Tela de login do NexTask](docs/images/nextask-login.png)](docs/images/nextask-login.png) | [![Gestão de membros do workspace](docs/images/nextask-members.png)](docs/images/nextask-members.png) |
+
 ## Arquitetura inicial
 
 ```text
