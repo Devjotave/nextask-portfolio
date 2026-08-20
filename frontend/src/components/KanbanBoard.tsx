@@ -6,6 +6,7 @@ interface KanbanBoardProps {
   tasks: Task[]
   movingTaskId: number | null
   onMove: (task: Task, status: TaskStatus) => void
+  onOpen: (task: Task) => void
 }
 
 const columns: Array<{ status: TaskStatus; label: string; tone: string }> = [
@@ -27,7 +28,7 @@ function formatDueDate(value: string): string {
   }).format(new Date(value))
 }
 
-export function KanbanBoard({ tasks, movingTaskId, onMove }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, movingTaskId, onMove, onOpen }: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
 
@@ -89,7 +90,11 @@ export function KanbanBoard({ tasks, movingTaskId, onMove }: KanbanBoardProps) {
                     </span>
                     <span className="task-card__id">NT-{task.id}</span>
                   </div>
-                  <h3>{task.title}</h3>
+                  <h3>
+                    <button type="button" onClick={() => onOpen(task)}>
+                      {task.title}
+                    </button>
+                  </h3>
                   {task.description && <p>{task.description}</p>}
                   <footer>
                     <span>{task.dueAt ? `Prazo ${formatDueDate(task.dueAt)}` : 'Sem prazo'}</span>

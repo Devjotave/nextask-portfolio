@@ -11,6 +11,14 @@ export interface Workspace {
   updatedAt: string
 }
 
+export interface WorkspaceMember {
+  userId: number
+  name: string
+  email: string
+  role: WorkspaceRole
+  joinedAt: string
+}
+
 interface WorkspaceResponse {
   id: number
   name: string
@@ -36,4 +44,58 @@ export async function createWorkspace(token: string, name: string): Promise<Work
   )
 
   return { ...workspace, role: 'OWNER' }
+}
+
+export function listWorkspaceMembers(
+  token: string,
+  workspaceId: number,
+): Promise<PageResponse<WorkspaceMember>> {
+  return authenticatedRequest<PageResponse<WorkspaceMember>>(
+    token,
+    `/api/workspaces/${workspaceId}/members?page=0&size=100`,
+  )
+}
+
+export function addWorkspaceMember(
+  token: string,
+  workspaceId: number,
+  userId: number,
+  role: WorkspaceRole,
+): Promise<WorkspaceMember> {
+  return authenticatedRequest<WorkspaceMember>(
+    token,
+    `/api/workspaces/${workspaceId}/members`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ userId, role }),
+    },
+  )
+}
+
+export function updateWorkspaceMember(
+  token: string,
+  workspaceId: number,
+  userId: number,
+  role: WorkspaceRole,
+): Promise<WorkspaceMember> {
+  return authenticatedRequest<WorkspaceMember>(
+    token,
+    `/api/workspaces/${workspaceId}/members/${userId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    },
+  )
+}
+
+export function removeWorkspaceMember(
+  token: string,
+  workspaceId: number,
+  userId: number,
+): Promise<void> {
+  return authenticatedRequest<void>(
+    token,
+    `/api/workspaces/${workspaceId}/members/${userId}`,
+    { method: 'DELETE' },
+  )
 }

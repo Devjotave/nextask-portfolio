@@ -4,10 +4,18 @@ interface ModalProps extends PropsWithChildren {
   isOpen: boolean
   title: string
   description: string
+  eyebrow?: string
   onClose: () => void
 }
 
-export function Modal({ isOpen, title, description, onClose, children }: ModalProps) {
+export function Modal({
+  isOpen,
+  title,
+  description,
+  eyebrow = 'Novo no quadro',
+  onClose,
+  children,
+}: ModalProps) {
   useEffect(() => {
     if (!isOpen) {
       return undefined
@@ -51,7 +59,7 @@ export function Modal({ isOpen, title, description, onClose, children }: ModalPr
           ×
         </button>
         <header>
-          <span className="section-kicker">Novo no quadro</span>
+          <span className="section-kicker">{eyebrow}</span>
           <h2 id="modal-title">{title}</h2>
           <p id="modal-description">{description}</p>
         </header>

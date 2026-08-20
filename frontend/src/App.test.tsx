@@ -52,6 +52,32 @@ const todoTask = {
   updatedAt: '2026-08-20T12:00:00Z',
 }
 
+const ownerMember = {
+  userId: 7,
+  name: 'Ana Souza',
+  email: 'ana@example.com',
+  role: 'OWNER',
+  joinedAt: '2026-08-20T12:00:00Z',
+}
+
+const projectMember = {
+  userId: 8,
+  name: 'Bruno Lima',
+  email: 'bruno@example.com',
+  role: 'MEMBER',
+  joinedAt: '2026-08-20T13:00:00Z',
+}
+
+const firstComment = {
+  id: 41,
+  taskId: 31,
+  authorId: 7,
+  authorName: 'Ana Souza',
+  content: 'API revisada e aprovada.',
+  createdAt: '2026-08-20T14:00:00Z',
+  updatedAt: '2026-08-20T14:00:00Z',
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -225,6 +251,9 @@ describe('NexTask frontend', () => {
       if (url.startsWith('/api/workspaces/11/projects?')) {
         return jsonResponse(page([]))
       }
+      if (url.startsWith('/api/workspaces/11/members?')) {
+        return jsonResponse(page([ownerMember]))
+      }
       if (url === '/api/workspaces/11/projects' && method === 'POST') {
         return jsonResponse(project, 201)
       }
@@ -281,6 +310,9 @@ describe('NexTask frontend', () => {
       if (url.startsWith('/api/workspaces/11/projects?')) {
         return jsonResponse(page([project]))
       }
+      if (url.startsWith('/api/workspaces/11/members?')) {
+        return jsonResponse(page([ownerMember]))
+      }
       if (url.startsWith('/api/projects/21/tasks?')) {
         return jsonResponse(page([todoTask]))
       }
@@ -309,6 +341,124 @@ describe('NexTask frontend', () => {
     expect(JSON.parse(String(updateRequest?.[1]?.body))).toEqual(
       expect.objectContaining({ status: 'IN_PROGRESS', title: 'Revisar API' }),
     )
+  })
+
+  it('updates task details, assigns a member and creates a comment', async () => {
+    const createdComment = {
+      ...firstComment,
+      id: 42,
+      authorId: 7,
+      content: 'Responsável definido.',
+    }
+    const fetchMock = installApiMock((url, method, options) => {
+      if (url.startsWith('/api/workspaces?')) {
+        return jsonResponse(page([workspace]))
+      }
+      if (url.startsWith('/api/workspaces/11/projects?')) {
+        return jsonResponse(page([project]))
+      }
+      if (url.startsWith('/api/workspaces/11/members?')) {
+        return jsonResponse(page([ownerMember, projectMember]))
+      }
+      if (url.startsWith('/api/projects/21/tasks?')) {
+        return jsonResponse(page([todoTask]))
+      }
+      if (url.startsWith('/api/tasks/31/comments?')) {
+        return jsonResponse(page([firstComment]))
+      }
+      if (url === '/api/tasks/31' && method === 'PUT') {
+        const body = JSON.parse(String(options?.body))
+        return jsonResponse({ ...todoTask, ...body, version: 1 })
+      }
+      if (url === '/api/tasks/31/comments' && method === 'POST') {
+        return jsonResponse(createdComment, 201)
+      }
+      if (url === '/api/comments/41' && method === 'PUT') {
+        const body = JSON.parse(String(options?.body))
+        return jsonResponse({ ...firstComment, ...body, updatedAt: '2026-08-20T15:00:00Z' })
+      }
+      if (url === '/api/comments/41' && method === 'DELETE') {
+        return new Response(null, { status: 204 })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    })
+    saveSession(createSession(authResponse))
+    window.history.pushState({}, '', '/app')
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Revisar API' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Detalhes da tarefa' })
+    expect(await within(dialog).findByText('API revisada e aprovada.')).toBeInTheDocument()
+
+    await user.selectOptions(within(dialog).getByLabelText('Responsável'), '8')
+    await user.selectOptions(within(dialog).getByLabelText('Status'), 'IN_PROGRESS')
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar detalhes' }))
+
+    expect(await within(dialog).findByText('Detalhes atualizados.')).toBeInTheDocument()
+    const updateRequest = fetchMock.mock.calls.find(
+      ([url, request]) => String(url) === '/api/tasks/31' && request?.method === 'PUT',
+    )
+    expect(JSON.parse(String(updateRequest?.[1]?.body))).toEqual(
+      expect.objectContaining({ assigneeId: 8, status: 'IN_PROGRESS', position: 0 }),
+    )
+
+    await user.type(within(dialog).getByLabelText('Novo comentário'), 'Responsável definido.')
+    await user.click(within(dialog).getByRole('button', { name: 'Comentar' }))
+    expect(await within(dialog).findByText('Responsável definido.')).toBeInTheDocument()
+
+    await user.click(within(dialog).getAllByRole('button', { name: 'Editar' })[0])
+    const editField = within(dialog).getByLabelText('Editar comentário')
+    await user.clear(editField)
+    await user.type(editField, 'API revisada novamente.')
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }))
+    expect(await within(dialog).findByText('API revisada novamente.')).toBeInTheDocument()
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await user.click(within(dialog).getAllByRole('button', { name: 'Excluir' })[0])
+    await waitFor(() =>
+      expect(within(dialog).queryByText('API revisada novamente.')).not.toBeInTheDocument(),
+    )
+    confirmSpy.mockRestore()
+  })
+
+  it('allows a workspace owner to add a member', async () => {
+    const fetchMock = installApiMock((url, method) => {
+      if (url.startsWith('/api/workspaces?')) {
+        return jsonResponse(page([workspace]))
+      }
+      if (url.startsWith('/api/workspaces/11/projects?')) {
+        return jsonResponse(page([project]))
+      }
+      if (url.startsWith('/api/workspaces/11/members?')) {
+        return jsonResponse(page([ownerMember]))
+      }
+      if (url.startsWith('/api/projects/21/tasks?')) {
+        return jsonResponse(page([todoTask]))
+      }
+      if (url === '/api/workspaces/11/members' && method === 'POST') {
+        return jsonResponse(projectMember, 201)
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    })
+    saveSession(createSession(authResponse))
+    window.history.pushState({}, '', '/app')
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Pessoas/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Membros do workspace' })
+    await user.type(within(dialog).getByLabelText('ID da pessoa'), '8')
+    await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }))
+
+    expect(await within(dialog).findByText('Bruno Lima')).toBeInTheDocument()
+    const addRequest = fetchMock.mock.calls.find(
+      ([url, request]) =>
+        String(url) === '/api/workspaces/11/members' && request?.method === 'POST',
+    )
+    expect(JSON.parse(String(addRequest?.[1]?.body))).toEqual({ userId: 8, role: 'MEMBER' })
   })
 
   it('ends the local session when the API rejects the token', async () => {

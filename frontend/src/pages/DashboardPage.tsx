@@ -15,11 +15,14 @@ import {
   type CreateTaskInput,
   type Task,
   type TaskStatus,
+  type UpdateTaskInput,
 } from '../api/tasks'
 import {
   createWorkspace,
+  listWorkspaceMembers,
   listWorkspaces,
   type Workspace,
+  type WorkspaceMember,
 } from '../api/workspaces'
 import { useAuth } from '../auth/AuthContext'
 import { Brand } from '../components/Brand'
@@ -29,6 +32,8 @@ import {
   CreateWorkspaceModal,
 } from '../components/CreateModals'
 import { KanbanBoard } from '../components/KanbanBoard'
+import { TaskDetailsPanel } from '../components/TaskDetailsPanel'
+import { WorkspaceMembersModal } from '../components/WorkspaceMembersModal'
 
 function initials(name: string): string {
   return name
@@ -53,6 +58,7 @@ export function DashboardPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true)
@@ -63,6 +69,8 @@ export function DashboardPage() {
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false)
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
@@ -71,6 +79,10 @@ export function DashboardPage() {
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
+  )
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId, tasks],
   )
 
   const handleRequestError = useCallback(
@@ -180,7 +192,36 @@ export function DashboardPage() {
   }, [handleRequestError, selectedWorkspaceId, token])
 
   useEffect(() => {
+    let active = true
+
+    async function load() {
+      if (!token || selectedWorkspaceId === null) {
+        setMembers([])
+        return
+      }
+
+      setMembers([])
+      try {
+        const response = await listWorkspaceMembers(token, selectedWorkspaceId)
+        if (active) {
+          setMembers(response.content)
+        }
+      } catch (error) {
+        if (active) {
+          handleRequestError(error)
+        }
+      }
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [handleRequestError, selectedWorkspaceId, token])
+
+  useEffect(() => {
     setTasks([])
+    setSelectedTaskId(null)
     void refreshTasks()
   }, [refreshTasks])
 
@@ -189,6 +230,7 @@ export function DashboardPage() {
   }
 
   const authenticatedToken = token
+  const authenticatedUserId = user.id
 
   function handleLogout() {
     logout()
@@ -273,6 +315,45 @@ export function DashboardPage() {
     }
   }
 
+  async function handleUpdateTaskDetails(taskId: number, input: UpdateTaskInput) {
+    const currentTask = tasks.find((task) => task.id === taskId)
+    const position =
+      currentTask && currentTask.status !== input.status
+        ? tasks.filter((task) => task.status === input.status).length
+        : input.position
+    try {
+      const updatedTask = await updateTask(authenticatedToken, taskId, {
+        ...input,
+        position,
+      })
+      setTasks((current) =>
+        current.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
+      )
+      setPageError(null)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await refreshTasks()
+      }
+      throw error
+    }
+  }
+
+  function handleMembersChange(nextMembers: WorkspaceMember[]) {
+    setMembers(nextMembers)
+    const currentMembership = nextMembers.find(
+      (member) => member.userId === authenticatedUserId,
+    )
+    if (currentMembership && selectedWorkspaceId !== null) {
+      setWorkspaces((current) =>
+        current.map((workspace) =>
+          workspace.id === selectedWorkspaceId
+            ? { ...workspace, role: currentMembership.role }
+            : workspace,
+        ),
+      )
+    }
+  }
+
   return (
     <div className="app-shell app-shell--kanban">
       <aside className="sidebar workspace-sidebar">
@@ -315,8 +396,8 @@ export function DashboardPage() {
         </div>
 
         <div className="sidebar__phase">
-          <span>Fase 9</span>
-          <strong>Kanban integrado</strong>
+          <span>Fase 10</span>
+          <strong>Colaboração ativa</strong>
           <div className="phase-progress" aria-label="Progresso da fase concluído">
             <span />
           </div>
@@ -406,6 +487,13 @@ export function DashboardPage() {
                 <button
                   className="secondary-button"
                   type="button"
+                  onClick={() => setIsMembersModalOpen(true)}
+                >
+                  Pessoas <span className="button-count">{members.length}</span>
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
                   onClick={() => setIsProjectModalOpen(true)}
                 >
                   + Projeto
@@ -455,6 +543,7 @@ export function DashboardPage() {
                     tasks={tasks}
                     movingTaskId={movingTaskId}
                     onMove={handleMoveTask}
+                    onOpen={(task) => setSelectedTaskId(task.id)}
                   />
                 )}
               </>
@@ -477,6 +566,26 @@ export function DashboardPage() {
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
         onCreate={handleCreateTask}
+      />
+      <WorkspaceMembersModal
+        isOpen={isMembersModalOpen}
+        token={authenticatedToken}
+        workspace={selectedWorkspace}
+        members={members}
+        currentUserId={authenticatedUserId}
+        onClose={() => setIsMembersModalOpen(false)}
+        onMembersChange={handleMembersChange}
+        onRequestError={handleRequestError}
+      />
+      <TaskDetailsPanel
+        task={selectedTask}
+        token={authenticatedToken}
+        members={members}
+        currentUserId={authenticatedUserId}
+        isWorkspaceOwner={selectedWorkspace?.role === 'OWNER'}
+        onClose={() => setSelectedTaskId(null)}
+        onSave={handleUpdateTaskDetails}
+        onRequestError={handleRequestError}
       />
     </div>
   )
