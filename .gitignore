@@ -6,6 +6,15 @@ backend/target/
 *.class
 *.log
 
+# React / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+frontend/.pnpm-store/
+frontend/.npm-cache/
+frontend/.env.*.local
+
 # IDEs
 .idea/
 *.iml
@@ -17,4 +26,3 @@ backend/target/
 # Operating systems
 .DS_Store
 Thumbs.db
-

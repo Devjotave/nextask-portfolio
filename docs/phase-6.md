@@ -88,9 +88,15 @@ Copie `.env.example` para `.env`, troque a senha do banco e gere a chave:
 
 ```powershell
 $jwtBytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Fill($jwtBytes)
+$jwtGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $jwtGenerator.GetBytes($jwtBytes)
+} finally {
+    $jwtGenerator.Dispose()
+}
 $jwtSecret = [Convert]::ToBase64String($jwtBytes)
 (Get-Content .env) -replace '^JWT_SECRET=.*$', "JWT_SECRET=$jwtSecret" | Set-Content .env
+Remove-Variable jwtSecret, jwtBytes, jwtGenerator
 ```
 
 `JWT_ISSUER` identifica a API e `JWT_ACCESS_TOKEN_TTL` aceita uma duração ISO-8601, como `PT1H`. Os testes usam uma chave exclusiva em `src/test/resources` e nunca dependem do segredo local.

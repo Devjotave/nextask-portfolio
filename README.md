@@ -4,7 +4,7 @@ Full Stack project management platform with Kanban boards, workspaces, teams and
 
 ## Status
 
-Em desenvolvimento — Fase 7 concluída: contrato OpenAPI e Swagger UI autenticável.
+Em desenvolvimento — Fase 8 concluída: frontend React com cadastro, login, sessão JWT e navegação protegida.
 
 ## Objetivo
 
@@ -13,15 +13,13 @@ O NexTask será uma aplicação web para gerenciamento colaborativo de projetos 
 ## Arquitetura inicial
 
 ```text
-React + TypeScript (fase futura)
-             ↓
-       API REST
-             ↓
-        Spring Boot 3
-             ↓
-       Spring Data JPA
-             ↓
-       Microsoft SQL Server
+React 19 + TypeScript
+         ↓ /api
+  Spring Boot 3 REST
+         ↓
+   Spring Data JPA
+         ↓
+Microsoft SQL Server
 ```
 
 O backend começa como um monólito modular em camadas. Os packages de cada módulo serão criados apenas quando a respectiva funcionalidade for implementada; Git não versiona diretórios vazios.
@@ -40,13 +38,20 @@ O backend começa como um monólito modular em camadas. Os packages de cada mód
 - Spring Boot Actuator
 - Microsoft SQL Server 2022 Express
 - JUnit 5
+- React 19 + TypeScript 6
+- Vite 8
+- React Router 7
+- Vitest + Testing Library
+- pnpm 11
 
-O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. React entra nas próximas fases, junto com código e testes que justifiquem suas dependências.
+O backend possui autenticação stateless com tokens JWT assinados por HMAC e documentação OpenAPI navegável. O frontend consome os contratos de autenticação, protege a área interna e mantém a sessão somente na aba atual do navegador.
 
 ## Pré-requisitos
 
 - Java 21
 - Maven 3.6.3 ou superior, ou Maven Wrapper incluído no projeto
+- Node.js 22.13 ou superior
+- pnpm 11
 - Git
 - SQL Server Express com a instância `SQLEXPRESS`
 - SQL Server Management Studio (SSMS) ou o utilitário `sqlcmd`
@@ -64,9 +69,15 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
 
    ```powershell
    $jwtBytes = New-Object byte[] 32
-   [Security.Cryptography.RandomNumberGenerator]::Fill($jwtBytes)
+   $jwtGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+   try {
+       $jwtGenerator.GetBytes($jwtBytes)
+   } finally {
+       $jwtGenerator.Dispose()
+   }
    $jwtSecret = [Convert]::ToBase64String($jwtBytes)
    (Get-Content .env) -replace '^JWT_SECRET=.*$', "JWT_SECRET=$jwtSecret" | Set-Content .env
+   Remove-Variable jwtSecret, jwtBytes, jwtGenerator
    ```
 
 3. Confirme no SQL Server que o modo de autenticação selecionado é **SQL Server e Windows**. Se precisar alterá-lo no SSMS, reinicie o serviço `SQL Server (SQLEXPRESS)`.
@@ -99,7 +110,23 @@ O backend possui autenticação stateless com tokens JWT assinados por HMAC e do
    {"status":"UP"}
    ```
 
-7. Abra a documentação interativa:
+7. Em outro terminal, instale e inicie o frontend:
+
+   ```powershell
+   Set-Location frontend
+   pnpm install
+   pnpm dev
+   ```
+
+8. Abra o NexTask no navegador:
+
+   ```text
+   http://localhost:5173
+   ```
+
+   O Vite encaminha chamadas `/api` para `http://localhost:8080`, portanto o backend deve continuar ligado. Use a tela para criar uma conta ou entrar; após a autenticação, a rota `/app` é liberada.
+
+9. Abra a documentação interativa do backend quando precisar inspecionar os contratos:
 
    ```text
    http://localhost:8080/swagger-ui.html
@@ -124,12 +151,25 @@ Teste real de integração com SQL Server:
 
 Os testes confirmam 37 cenários rápidos e 16 cenários de integração, cobrindo autenticação, emissão e validação de tokens, identidade autenticada, documentação OpenAPI, regras `OWNER`/`MEMBER` e os fluxos HTTP completos no SQL Server.
 
+Qualidade e build do frontend:
+
+```powershell
+Set-Location frontend
+pnpm lint
+pnpm test
+pnpm build
+```
+
+O frontend possui 9 testes automatizados para rotas protegidas, login, erros da API, confirmação de senha, restauração e encerramento da sessão. O build também executa a verificação estrita de tipos do TypeScript.
+
 ## Segurança local
 
 - `.env` nunca deve ser enviado ao GitHub.
 - `JWT_SECRET` deve conter pelo menos 32 bytes aleatórios codificados em Base64 e nunca deve ser publicado.
 - Tokens inválidos ou ausentes recebem `401`; operações sem permissão no workspace recebem `403`.
 - A documentação fica ativa por padrão no ambiente local e pode ser desabilitada com `OPENAPI_ENABLED=false`.
+- O frontend mantém o JWT em `sessionStorage`: a sessão sobrevive a uma atualização da página, mas é removida ao fechar a aba ou sair da conta.
+- Variáveis prefixadas com `VITE_` ficam disponíveis no navegador e nunca devem conter segredos.
 - A aplicação não usa sua conta do Windows nem a conta administrativa `sa`.
 - `trustServerCertificate=true` é aceito somente no ambiente local; em produção será usado um certificado confiável.
 - O Hibernate está configurado com `ddl-auto=validate`, portanto não altera o schema silenciosamente.
@@ -145,6 +185,7 @@ Os roteiros explicados estão disponíveis por fase:
 - [`docs/phase-5.md`](docs/phase-5.md): projetos, tarefas, comentários e concorrência otimista.
 - [`docs/phase-6.md`](docs/phase-6.md): Spring Security, JWT, identidade autenticada e autorização.
 - [`docs/phase-7.md`](docs/phase-7.md): contrato OpenAPI, Swagger UI e testes da documentação.
+- [`docs/phase-8.md`](docs/phase-8.md): React, autenticação, sessão no navegador, rotas e testes do frontend.
 
 ## Roadmap resumido
 
@@ -158,5 +199,6 @@ Os roteiros explicados estão disponíveis por fase:
 - [x] Projetos, tarefas e comentários
 - [x] Spring Security e JWT
 - [x] Swagger/OpenAPI
-- [ ] React e quadro Kanban
+- [x] React, autenticação e navegação protegida
+- [ ] Workspaces e quadro Kanban
 - [ ] Deploy
