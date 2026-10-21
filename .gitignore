@@ -1,6 +1,23 @@
-# Local secrets
+# Local secrets (applies to root and nested directories)
 .env
-.env.compose
+.env.*
+!.env.example
+!.env.*.example
+
+# Private keys and local certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+
+# Local database files and backups
+*.mdf
+*.ldf
+*.bak
 
 # Java / Maven
 backend/target/
@@ -14,7 +31,6 @@ frontend/coverage/
 frontend/.vite/
 frontend/.pnpm-store/
 frontend/.npm-cache/
-frontend/.env.*.local
 
 # IDEs
 .idea/
