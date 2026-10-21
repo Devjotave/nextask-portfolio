@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24.17.0-alpine3.23 AS build
+FROM node:26.12.0-alpine3.23 AS build
 WORKDIR /workspace
 
 RUN npm install --global pnpm@11.19.0
