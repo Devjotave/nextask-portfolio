@@ -9,7 +9,7 @@ RUN mvn -B -ntp dependency:go-offline
 COPY src ./src
 RUN mvn -B -ntp -DskipTests package
 
-FROM eclipse-temurin:21-jre-alpine-3.23
+FROM eclipse-temurin:24-jre-alpine-3.22
 WORKDIR /app
 
 RUN addgroup -S nextask && adduser -S nextask -G nextask
