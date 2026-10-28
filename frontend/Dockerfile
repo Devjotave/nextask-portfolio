@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 COPY . ./
 RUN pnpm build
 
-FROM nginxinc/nginx-unprivileged:1.30.4-alpine-slim
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine-slim
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/dist /usr/share/nginx/html
