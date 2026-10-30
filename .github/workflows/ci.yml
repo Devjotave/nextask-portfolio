@@ -40,9 +40,13 @@ jobs:
         run: ./mvnw -B -ntp test
 
   frontend:
-    name: Frontend
+    name: Frontend (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24, 26]
     steps:
       - name: Baixar o código
         uses: actions/checkout@v7
@@ -51,7 +55,7 @@ jobs:
         uses: pnpm/setup@v2
         with:
           version: 11.19.0
-          runtime: node@24
+          runtime: node@${{ matrix.node }}
           cache: true
           cache-dependency-path: frontend/pnpm-lock.yaml
           package-json-file: frontend/package.json
@@ -74,9 +78,9 @@ jobs:
         run: pnpm build
 
   containers:
-    name: Imagens de produção
+    name: Integração e containers de produção
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs:
       - backend
       - frontend
@@ -84,6 +88,10 @@ jobs:
       MSSQL_SA_PASSWORD: CI_StrongAdminPassword_456!
       DB_PASSWORD: CI_StrongAppPassword_123!
       JWT_SECRET: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+      COMPOSE_FILE: compose.yml:compose.ci.yml
+      COMPOSE_PROJECT_NAME: nextask-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      DB_URL: jdbc:sqlserver://127.0.0.1:1433;databaseName=nextask;encrypt=true;trustServerCertificate=true
+      DB_USERNAME: nextask_app
     steps:
       - name: Baixar o código
         uses: actions/checkout@v7
@@ -91,8 +99,30 @@ jobs:
       - name: Validar a composição
         run: docker compose config --quiet
 
-      - name: Construir a imagem do backend
-        run: docker build --tag nextask-backend:ci ./backend
+      - name: Preparar Java para os testes de integração
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
 
-      - name: Construir a imagem do frontend
-        run: docker build --tag nextask-frontend:ci ./frontend
+      - name: Iniciar a aplicação e aguardar os healthchecks
+        run: docker compose up --build --wait --wait-timeout 240
+
+      - name: Executar testes com SQL Server
+        working-directory: backend
+        run: bash mvnw -B -ntp verify -Pintegration-test
+
+      - name: Validar a aplicação pelo Nginx
+        run: python3 scripts/smoke-containers.py
+
+      - name: Mostrar diagnóstico em caso de falha
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 100
+
+      - name: Encerrar os serviços e remover os dados temporários
+        if: always()
+        run: docker compose down --volumes --remove-orphans

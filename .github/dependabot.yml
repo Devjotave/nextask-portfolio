@@ -4,11 +4,23 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    groups:
+      spring-platform:
+        patterns:
+          - "org.springframework.boot:spring-boot-starter-parent"
+          - "org.springdoc:springdoc-openapi-starter-webmvc-ui"
 
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+    groups:
+      react-runtime:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
 
   - package-ecosystem: github-actions
     directory: /
