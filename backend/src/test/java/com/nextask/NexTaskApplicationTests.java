@@ -6,11 +6,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,14 +30,17 @@ import com.nextask.workspace.WorkspaceMemberRepository;
 import com.nextask.workspace.WorkspaceRepository;
 
 @SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
-                + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration"
+        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
+                + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration"
 })
 @AutoConfigureMockMvc
 class NexTaskApplicationTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JwtEncoder jwtEncoder;
 
     @MockitoBean
     private UserRepository userRepository;
@@ -76,5 +87,41 @@ class NexTaskApplicationTests {
         mockMvc.perform(get("/swagger-ui.html"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", "/swagger-ui/index.html"));
+    }
+
+    @Test
+    void rejectsMissingOrMalformedTokensWithProblemJson() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401));
+
+        assertRejectedToken("invalid.jwt.token");
+    }
+
+    @Test
+    void rejectsExpiredTokensAndTokensFromAnotherIssuer() throws Exception {
+        Instant now = Instant.now();
+        assertRejectedToken(signedToken("nextask-test", now.minusSeconds(600), now.minusSeconds(300)));
+        assertRejectedToken(signedToken("another-issuer", now, now.plusSeconds(300)));
+    }
+
+    private String signedToken(String issuer, Instant issuedAt, Instant expiresAt) {
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject("1")
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt)
+                .build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+    }
+
+    private void assertRejectedToken(String token) throws Exception {
+        mockMvc.perform(get("/api/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401));
     }
 }

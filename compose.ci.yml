@@ -1,0 +1,5 @@
+# Use only with the disposable database created by GitHub Actions.
+services:
+  database:
+    ports:
+      - "127.0.0.1:1433:1433"
